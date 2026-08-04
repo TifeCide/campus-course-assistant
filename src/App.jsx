@@ -408,11 +408,11 @@ function getQuerySnapshotFromUrl(search) {
 
 function getViewLabel(view) {
   return {
-    available: "查询教室",
-    courses: "查询课程",
-    teachers: "查询教师",
-    classes: "查询班级",
-  }[view] || "查询教室";
+    available: "教室",
+    courses: "课程",
+    teachers: "教师",
+    classes: "班级",
+  }[view] || "教室";
 }
 
 function getViewSearchLabel(view) {
@@ -1896,8 +1896,8 @@ function LoadingScreen({ progress, stage }) {
             <DoorOpen size={19} strokeWidth={2.2} />
           </div>
           <div>
-            <strong>校园课程助手 · ZSC</strong>
-            <span>正在准备数据,首次加载可能需要较长时间</span>
+            <strong>校园课程助手</strong>
+            <span>正在准备数据·可能需要较长时间</span>
           </div>
           <LoaderCircle className="loader" size={18} />
         </div>
@@ -2605,7 +2605,7 @@ function App() {
                 type="button"
               >
                 <LayoutGrid size={16} />
-                查询教室
+                教室
               </button>
               <button
                 className={cn("view-tab", activeView === "courses" && "is-active")}
@@ -2613,7 +2613,7 @@ function App() {
                 type="button"
               >
                 <BookOpen size={16} />
-                查询课程
+                课程
               </button>
               <button
                 className={cn("view-tab", activeView === "teachers" && "is-active")}
@@ -2621,7 +2621,7 @@ function App() {
                 type="button"
               >
                 <UserRound size={16} />
-                查询教师
+                教师
               </button>
               <button
                 className={cn("view-tab", activeView === "classes" && "is-active")}
@@ -2629,7 +2629,7 @@ function App() {
                 type="button"
               >
                 <Users size={16} />
-                查询班级
+                班级
               </button>
             </div>
             <div className="panel-actions">
@@ -2776,10 +2776,10 @@ function App() {
         ) : null}
 
         {recentQueries.length ? (
-          <section className="recent-query-strip" aria-label="最近查询">
+          <section className="recent-query-strip" aria-label="最近查看">
             <div className="recent-query-title">
               <History size={15} />
-              最近查询
+              最近查看
             </div>
             <div className="recent-query-list">
               {recentQueries.map((snapshot, index) => (
