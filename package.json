@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "parse": "node scripts/parse-classrooms.js",
-    "update-data": "npm run parse && npm run build",
+    "parse-schedule": "node scripts/parse-schedule.js",
+    "update-data": "npm run parse && npm run parse-schedule && npm run build",
     "build": "vite build",
     "preview": "vite preview"
   },

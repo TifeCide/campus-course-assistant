@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   ArrowUpRight,
   ArrowUp,
+  ArrowDown,
   Bell,
   BookOpen,
   Building2,
@@ -32,12 +33,15 @@ import {
   Sparkles,
   Sun,
   TriangleAlert,
+  UserRound,
+  ArrowUpToLine,
   Users,
   X,
   Github,
 } from "lucide-react";
 
 const DATA_URL = `${import.meta.env.BASE_URL}data/classroom-data.json`;
+const SCHEDULE_URL = `${import.meta.env.BASE_URL}data/schedule-index.json`;
 const SETTINGS_URL = `${import.meta.env.BASE_URL}data/setting.json`;
 const FAVORITES_STORAGE_KEY = "classroom-favorites";
 const RECENT_QUERIES_STORAGE_KEY = "classroom-recent-queries";
@@ -360,6 +364,7 @@ function createQuerySnapshot({
   selectedFloors,
   selectedZones,
   query,
+  entityLabel = "",
 }) {
   return {
     activeView,
@@ -374,6 +379,7 @@ function createQuerySnapshot({
     selectedFloors,
     selectedZones,
     query,
+    entityLabel,
   };
 }
 
@@ -382,7 +388,9 @@ function getQuerySnapshotFromUrl(search) {
   const parseList = (key) => params.get(key)?.split(",").filter(Boolean) ?? [];
 
   return {
-    activeView: params.get("view") === "courses" ? "courses" : "available",
+    activeView: ["available", "courses", "teachers", "classes"].includes(params.get("view"))
+      ? params.get("view")
+      : "available",
     temporalMode: params.get("mode") === "date" ? "date" : "week",
     selectedWeek: Number(params.get("week")) || DEFAULT_WEEK,
     selectedWeekday: Number(params.get("weekday")) || DEFAULT_WEEKDAY,
@@ -394,13 +402,36 @@ function getQuerySnapshotFromUrl(search) {
     selectedFloors: parseList("floors"),
     selectedZones: parseList("zones"),
     query: params.get("q") || "",
+    entityLabel: params.get("entity") || "",
   };
+}
+
+function getViewLabel(view) {
+  return {
+    available: "查询教室",
+    courses: "查询课程",
+    teachers: "查询教师",
+    classes: "查询班级",
+  }[view] || "查询教室";
+}
+
+function getViewSearchLabel(view) {
+  return {
+    available: "搜索教室",
+    courses: "搜索课程",
+    teachers: "搜索教师",
+    classes: "搜索行政班",
+  }[view] || "搜索教室";
+}
+
+function normalizeView(value) {
+  return ["available", "courses", "teachers", "classes"].includes(value) ? value : "available";
 }
 
 function getQueryUrl(snapshot) {
   const params = new URLSearchParams();
 
-  if (snapshot.activeView === "courses") params.set("view", "courses");
+  if (snapshot.activeView !== "available") params.set("view", snapshot.activeView);
   if (snapshot.temporalMode === "date") {
     params.set("mode", "date");
     if (snapshot.selectedDate) params.set("date", snapshot.selectedDate);
@@ -417,12 +448,17 @@ function getQueryUrl(snapshot) {
   if (snapshot.selectedFloors.length) params.set("floors", snapshot.selectedFloors.join(","));
   if (snapshot.selectedZones.length) params.set("zones", snapshot.selectedZones.join(","));
   if (snapshot.query) params.set("q", snapshot.query);
+  if (snapshot.entityLabel) params.set("entity", snapshot.entityLabel);
 
   const queryString = params.toString();
   return `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
 }
 
 function getRecentQueryLabel(snapshot, data) {
+  if (snapshot.entityLabel) {
+    const viewLabel = snapshot.activeView === "courses" ? "课程" : snapshot.activeView === "teachers" ? "教师" : "班级";
+    return `${viewLabel} · ${snapshot.entityLabel}`;
+  }
   const day = data?.weekdays.find((item) => item.index === Number(snapshot.selectedWeekday));
   const periods = snapshot.selectedPeriods.join("、");
   const scope = [
@@ -658,6 +694,7 @@ function Toggle({ checked, onChange, label }) {
 
 function TemporalPicker({
   mode,
+  onToday,
   onModeChange,
   selectedWeek,
   selectedWeekday,
@@ -671,8 +708,15 @@ function TemporalPicker({
 }) {
   return (
     <div className="temporal-picker">
+      {onToday ? (
+        <div className="temporal-now-row">
+          <button className="button button-outline panel-now-button" onClick={onToday} type="button">
+            快速选择当前时间
+          </button>
+        </div>
+      ) : null}
       <div className="field-label-row">
-        <span className="field-label">时间定位</span>
+        <span className="field-label">日期选择</span>
         <div className="binary-toggle" role="group" aria-label="周次或日期">
           <button className={cn(mode === "week" && "is-active")} onClick={() => onModeChange("week")} type="button">
             周次
@@ -843,17 +887,79 @@ function EmptyState({ hasQuery, onReset }) {
   );
 }
 
-function CourseRow({ entry, room, onOpen }) {
+function DirectoryEmptyState({ view, hasQuery, onReset }) {
+  const label = view === "courses" ? "课程" : view === "teachers" ? "教师" : "班级";
   return (
-    <button className="course-row" onClick={() => onOpen(room)} type="button">
+    <div className="empty-state">
+      <div className="empty-mark">
+        {view === "courses" ? <BookOpen size={28} strokeWidth={1.5} /> : view === "teachers" ? <UserRound size={28} strokeWidth={1.5} /> : <Users size={28} strokeWidth={1.5} />}
+      </div>
+      <h3>{hasQuery ? `没有符合条件的${label}` : `输入${label}名称开始查询`}</h3>
+      <p>{hasQuery ? "试试减少关键词，或调整地点筛选。" : `支持搜索${label}姓名或名称。`}</p>
+      {hasQuery ? (
+        <button className="button button-outline" onClick={onReset} type="button">
+          清除搜索
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function EntityResultCard({ view, label, entries, onOpen }) {
+  const courseCount = new Set(entries.map((entry) => entry.courseName).filter(Boolean)).size;
+  const teacherCount = new Set(entries.map((entry) => entry.teacher).filter(Boolean)).size;
+  const classCount = new Set(entries.map((entry) => entry.classGroup).filter(Boolean)).size;
+  const roomCount = new Set(entries.map((entry) => entry.roomName).filter(Boolean)).size;
+  const Icon = view === "courses" ? BookOpen : view === "teachers" ? UserRound : Users;
+  const detail = view === "courses"
+    ? `${teacherCount} 位教师 · ${classCount} 个班级`
+    : view === "teachers"
+      ? `${courseCount} 门课程 · ${classCount} 个班级`
+      : `${courseCount} 门课程 · ${teacherCount} 位教师`;
+
+  return (
+    <button className="entity-result-card" onClick={() => onOpen(view, label)} type="button">
+      <span className="entity-result-icon"><Icon size={18} /></span>
+      <span className="entity-result-copy">
+        <strong>{label}</strong>
+        <small>{detail} · {roomCount} 间教室</small>
+      </span>
+      <span className="entity-result-action">查看周课表 <ArrowUpRight size={15} /></span>
+    </button>
+  );
+}
+
+function EntityLink({ label, view, onNavigate, muted = false, className = "" }) {
+  if (!label) return null;
+  return (
+    <button className={cn("entity-link", muted && "is-muted", className)} onClick={() => onNavigate(view, label)} type="button">
+      {label}
+    </button>
+  );
+}
+
+function CourseRow({ entry, room, onOpen, onNavigate }) {
+  const roomName = room?.name || entry.roomName || "未标注教室";
+  return (
+    <div className="course-row">
       <div className="course-main">
-        <span className="course-name">{entry.courseName || "未命名课程"}</span>
-        <span className="course-room">{room.name}</span>
+        <EntityLink label={entry.courseName || "未命名课程"} view="courses" onNavigate={onNavigate} className="course-name" />
+        {room ? (
+          <button className="course-room entity-link" onClick={() => onOpen(room)} type="button">
+            {roomName}
+          </button>
+        ) : (
+          <span className="course-room">{roomName}</span>
+        )}
       </div>
       <div className="course-info">
         <span>
+          <UserRound size={14} />
+          <EntityLink label={entry.teacher || "未标注教师"} view="teachers" onNavigate={onNavigate} muted />
+        </span>
+        <span>
           <Users size={14} />
-          {entry.teacher || "未标注教师"}
+          <EntityLink label={entry.classGroup || "未标注班级"} view="classes" onNavigate={onNavigate} muted />
         </span>
         <span>
           <CalendarDays size={14} />
@@ -861,9 +967,46 @@ function CourseRow({ entry, room, onOpen }) {
         </span>
         <span>{entry.weekText || "未标注周次"}</span>
       </div>
-      <ArrowUpRight className="course-arrow" size={16} />
-    </button>
+      {room ? <ArrowUpRight className="course-arrow" size={16} /> : null}
+    </div>
   );
+}
+
+function ScheduleRow({ entry, room, onOpen, onNavigate, view }) {
+  const canOpenRoom = Boolean(room);
+  const content = (
+    <>
+      <div className="course-main">
+        <EntityLink label={entry.courseName || "未命名课程"} view="courses" onNavigate={onNavigate} className="course-name" />
+        {canOpenRoom ? (
+          <button className="course-room entity-link" onClick={() => onOpen(room)} type="button">
+            {entry.roomName}
+          </button>
+        ) : (
+          <span className="course-room">{entry.roomName || "未标注教室"}</span>
+        )}
+      </div>
+      <div className="course-info">
+        <span>
+          {view === "teachers" ? <Users size={14} /> : <UserRound size={14} />}
+          <EntityLink
+            label={view === "teachers" ? entry.classGroup || "未标注班级" : entry.teacher || "未标注教师"}
+            view={view === "teachers" ? "classes" : "teachers"}
+            onNavigate={onNavigate}
+            muted
+          />
+        </span>
+        <span>
+          <CalendarDays size={14} />
+          {entry.weekdayLabel} · {entry.periodCode}
+        </span>
+        <span>{entry.weekText || "未标注周次"}</span>
+      </div>
+      {canOpenRoom ? <ArrowUpRight className="course-arrow" size={16} /> : null}
+    </>
+  );
+
+  return <div className={cn("course-row", !canOpenRoom && "schedule-row-disabled")}>{content}</div>;
 }
 
 function Modal({ open, onOpenChange, className, children }) {
@@ -1100,6 +1243,7 @@ function RoomDialog({
   onClose,
   isFavorite,
   onToggleFavorite,
+  onNavigate,
 }) {
   if (!room) return null;
 
@@ -1235,12 +1379,349 @@ function RoomDialog({
                 <div className={cn("schedule-cell", entries.length && "is-occupied")} key={`${day.index}-${slot.code}`}>
                   {entries.length ? (
                     <div className="schedule-course">
-                      <strong>{entries[0].courseName}</strong>
-                      <span>{entries[0].teacher || "未标注教师"}</span>
-                      {entries.length > 1 ? <small>+{entries.length - 1} 项安排</small> : null}
+                      <ExpandableScheduleEntries
+                        entries={entries}
+                        collapsedCount={1}
+                        renderEntry={(entry, index) => (
+                          <div className="schedule-entry-copy" key={`${entry.courseName}-${entry.teacher}-${entry.classGroup}-${index}`}>
+                            <button className="schedule-entity-link" onClick={() => onNavigate("courses", entry.courseName)} type="button">
+                              {entry.courseName}
+                            </button>
+                            <button className="schedule-entity-link" onClick={() => onNavigate("teachers", entry.teacher)} type="button">
+                              {entry.teacher || "未标注教师"}
+                            </button>
+                            {entry.classGroup ? (
+                              <button className="schedule-entity-link" onClick={() => onNavigate("classes", entry.classGroup)} type="button">
+                                {entry.classGroup}
+                              </button>
+                            ) : null}
+                          </div>
+                        )}
+                      />
                     </div>
                   ) : (
                     <span className="schedule-free">空闲</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+function ExpandableScheduleEntries({ entries, collapsedCount = 2, renderEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleEntries = expanded ? entries : entries.slice(0, collapsedCount);
+  const hiddenCount = Math.max(0, entries.length - collapsedCount);
+
+  return (
+    <div className="schedule-entry-list">
+      {visibleEntries.map((entry, index) => renderEntry(entry, index))}
+      {hiddenCount > 0 ? (
+        <button
+          className="schedule-more"
+          onClick={() => setExpanded((value) => !value)}
+          type="button"
+          aria-expanded={expanded}
+        >
+          {expanded ? "收起安排" : `+${hiddenCount} 项安排`}
+          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function getScheduleSourceEntries(scheduleData, view) {
+  if (view === "courses") return scheduleData?.courseEntries ?? [];
+  if (view === "teachers") return scheduleData?.teacherEntries ?? [];
+  if (view === "classes") return scheduleData?.entries ?? [];
+  return [];
+}
+
+function getScheduleEntityValue(entry, view) {
+  if (view === "courses") return entry.courseName;
+  if (view === "teachers") return entry.teacher;
+  if (view === "classes") return entry.classGroup;
+  return "";
+}
+
+function getEntityDialogTitle(view) {
+  return {
+    courses: "课程课表",
+    teachers: "教师课表",
+    classes: "班级课表",
+  }[view] || "课表详情";
+}
+
+function getEntityScheduleStatus(entries, data, selectedWeek, currentNow, currentTemporal) {
+  if (!entries.length || !data || selectedWeek !== currentTemporal?.week) return null;
+
+  const parts = getShanghaiParts(currentNow);
+  const currentDay = parts.weekdayIndex;
+  const currentMinutes = parts.hour * 60 + parts.minute;
+  const slotIndex = data.timeSlots.findIndex((slot) => {
+    const start = timeToMinutes(slot.start);
+    const end = timeToMinutes(slot.end);
+    return currentMinutes >= start && currentMinutes < end;
+  });
+  const nextSlotIndex = slotIndex >= 0
+    ? slotIndex
+    : data.timeSlots.findIndex((slot) => currentMinutes < timeToMinutes(slot.start));
+  const currentPosition = slotIndex >= 0
+    ? (currentDay - 1) * data.timeSlots.length + slotIndex
+    : nextSlotIndex >= 0
+      ? (currentDay - 1) * data.timeSlots.length + nextSlotIndex
+      : currentDay * data.timeSlots.length;
+  const sortedEntries = [...entries].sort((left, right) => {
+    const leftIndex = data.timeSlots.findIndex((slot) => slot.code === left.periodCode);
+    const rightIndex = data.timeSlots.findIndex((slot) => slot.code === right.periodCode);
+    return left.weekday - right.weekday || leftIndex - rightIndex;
+  });
+  const currentEntries = slotIndex >= 0
+    ? sortedEntries.filter((entry) => entry.weekday === currentDay && entry.periodCode === data.timeSlots[slotIndex]?.code)
+    : [];
+  const nextEntry = sortedEntries.find((entry) => {
+    const entrySlotIndex = data.timeSlots.findIndex((slot) => slot.code === entry.periodCode);
+    const entryPosition = (entry.weekday - 1) * data.timeSlots.length + entrySlotIndex;
+    return entryPosition >= currentPosition && !currentEntries.includes(entry);
+  }) || sortedEntries[0] || null;
+
+  return {
+    currentEntries,
+    nextEntry,
+    isCurrentWeek: true,
+  };
+}
+
+function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom }) {
+  const primary = view === "courses" ? entry.classGroup : entry.courseName;
+  const secondary = view === "teachers" ? entry.classGroup : entry.teacher;
+
+  return (
+    <div className="schedule-course entity-schedule-course">
+      {view === "courses" ? (
+        <button className="schedule-entity-link" onClick={() => onNavigate("classes", entry.classGroup)} type="button">
+          {primary || "未标注班级"}
+        </button>
+      ) : (
+        <button className="schedule-entity-link" onClick={() => onNavigate("courses", entry.courseName)} type="button">
+          {primary || "未命名课程"}
+        </button>
+      )}
+      {view !== "teachers" ? (
+        <button className="schedule-entity-link" onClick={() => onNavigate("teachers", entry.teacher)} type="button">
+          {secondary || "未标注教师"}
+        </button>
+      ) : (
+        <button className="schedule-entity-link" onClick={() => onNavigate("classes", entry.classGroup)} type="button">
+          {secondary || "未标注班级"}
+        </button>
+      )}
+      {room ? (
+        <button className="schedule-entity-link schedule-room-link" onClick={() => onOpenRoom(room)} type="button">
+          {entry.roomName}
+        </button>
+      ) : (
+        <small>{entry.roomName || "未标注教室"}</small>
+      )}
+    </div>
+  );
+}
+
+function EntityScheduleDialog({
+  entity,
+  scheduleData,
+  data,
+  selectedWeek,
+  selectedWeekday,
+  selectedPeriods,
+  currentNow,
+  currentTemporal,
+  maxWeek,
+  roomByName,
+  onClose,
+  onWeekChange,
+  onFilterChange,
+  onNavigate,
+  onOpenRoom,
+}) {
+  if (!entity || !scheduleData || !data) return null;
+
+  const sourceEntries = getScheduleSourceEntries(scheduleData, entity.view);
+  const allEntries = sourceEntries.filter((entry) => getScheduleEntityValue(entry, entity.view) === entity.label);
+  const weekEntries = allEntries.filter((entry) => entry.weeks.includes(Number(selectedWeek)));
+  const selectedEntries = weekEntries.filter(
+    (entry) => entry.weekday === Number(selectedWeekday) && selectedPeriods.includes(entry.periodCode),
+  );
+  const relatedCourses = [...new Set(weekEntries.map((entry) => entry.courseName).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, "zh-Hans-u-co-pinyin"));
+  const relatedTeachers = [...new Set(weekEntries.map((entry) => entry.teacher).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, "zh-Hans-u-co-pinyin"));
+  const relatedClasses = [...new Set(weekEntries.map((entry) => entry.classGroup).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, "zh-Hans-u-co-pinyin"));
+  const detailEntries = weekEntries.filter((entry) => {
+    if (entity.courseFilter && entry.courseName !== entity.courseFilter) return false;
+    if (entity.teacherFilter && entry.teacher !== entity.teacherFilter) return false;
+    if (entity.classFilter && entry.classGroup !== entity.classFilter) return false;
+    return true;
+  });
+  const liveStatus = getEntityScheduleStatus(detailEntries, data, selectedWeek, currentNow, currentTemporal);
+  const courseCount = new Set(weekEntries.map((entry) => entry.courseName).filter(Boolean)).size;
+  const teacherCount = new Set(weekEntries.map((entry) => entry.teacher).filter(Boolean)).size;
+  const classCount = new Set(weekEntries.map((entry) => entry.classGroup).filter(Boolean)).size;
+  const roomCount = new Set(weekEntries.map((entry) => entry.roomName).filter(Boolean)).size;
+  const selectedDay = data.weekdays.find((day) => day.index === Number(selectedWeekday));
+  const selectedPeriodLabel = data.timeSlots
+    .filter((slot) => selectedPeriods.includes(slot.code))
+    .map((slot) => slot.label)
+    .join("、");
+  const selectedEntriesForDisplay = selectedEntries.filter((entry) => detailEntries.includes(entry));
+  const relatedLabel = entity.view === "courses"
+    ? `${teacherCount} 位教师 / ${classCount} 个班级`
+    : entity.view === "teachers"
+      ? `${courseCount} 门课程 / ${classCount} 个班级`
+      : `${courseCount} 门课程 / ${teacherCount} 位教师`;
+
+  return (
+    <Modal open={Boolean(entity)} onOpenChange={onClose} className="dialog dialog-room dialog-entity">
+      <div className="dialog-header">
+        <div>
+          <div className="eyebrow">{getEntityDialogTitle(entity.view)}</div>
+          <h2>{entity.label}</h2>
+          <p>
+            <CalendarDays size={14} />
+            第 {selectedWeek} 周完整安排
+          </p>
+          <label className="entity-week-control">
+            <span>查看周次</span>
+            <select value={selectedWeek} onChange={(event) => onWeekChange(Number(event.target.value))}>
+              {Array.from({ length: maxWeek }, (_, index) => (
+                <option value={index + 1} key={index + 1}>
+                  第 {index + 1} 周
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
+          <X size={19} />
+        </button>
+      </div>
+
+      <div className="dialog-summary">
+        <div>
+          <span>本周安排</span>
+          <strong>{weekEntries.length} 项</strong>
+        </div>
+        <div>
+          <span>关联信息</span>
+          <strong>{relatedLabel}</strong>
+        </div>
+        <div>
+          <span>涉及教室</span>
+          <strong>{roomCount} 间</strong>
+        </div>
+      </div>
+
+      <div className="entity-live-grid">
+        <div className="entity-live-item">
+          <Clock3 size={16} />
+          <div>
+            <span>当前定位</span>
+            <strong>{selectedDay?.shortLabel} {selectedPeriodLabel}</strong>
+            <small>{selectedEntriesForDisplay.length ? `${selectedEntriesForDisplay.length} 项安排` : "暂无安排"}</small>
+          </div>
+        </div>
+        <div className="entity-live-item">
+          <ArrowUpRight size={16} />
+          <div>
+            <span>{liveStatus?.currentEntries.length ? "正在上课" : "下一节课程"}</span>
+            <strong>
+              {liveStatus?.currentEntries[0]?.courseName || liveStatus?.nextEntry?.courseName || "当前周暂无后续课程"}
+            </strong>
+            <small>
+              {liveStatus?.currentEntries.length
+                ? "当前时间段"
+                : liveStatus?.nextEntry
+                  ? `${data.weekdays.find((day) => day.index === liveStatus.nextEntry.weekday)?.shortLabel ?? ""} · ${liveStatus.nextEntry.periodCode}`
+                  : "请选择其他周次查看安排"}
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <div className="entity-filter-row">
+        <div className="filter-title"><Filter size={15} /> 课表筛选</div>
+        {entity.view !== "courses" ? (
+          <label className="entity-filter-field">
+            <span>课程</span>
+            <select value={entity.courseFilter || ""} onChange={(event) => onFilterChange("courseFilter", event.target.value)}>
+              <option value="">全部课程</option>
+              {relatedCourses.map((item) => <option value={item} key={item}>{item}</option>)}
+            </select>
+          </label>
+        ) : null}
+        {entity.view !== "teachers" ? (
+          <label className="entity-filter-field">
+            <span>教师</span>
+            <select value={entity.teacherFilter || ""} onChange={(event) => onFilterChange("teacherFilter", event.target.value)}>
+              <option value="">全部教师</option>
+              {relatedTeachers.map((item) => <option value={item} key={item}>{item}</option>)}
+            </select>
+          </label>
+        ) : null}
+        {entity.view !== "classes" ? (
+          <label className="entity-filter-field">
+            <span>班级</span>
+            <select value={entity.classFilter || ""} onChange={(event) => onFilterChange("classFilter", event.target.value)}>
+              <option value="">全部班级</option>
+              {relatedClasses.map((item) => <option value={item} key={item}>{item}</option>)}
+            </select>
+          </label>
+        ) : null}
+      </div>
+
+      <div className="schedule">
+        <div className="schedule-head">
+          <div className="schedule-corner">节次</div>
+          {data.weekdays.map((day) => (
+            <div className="schedule-day" key={day.index}>
+              {day.shortLabel}
+            </div>
+          ))}
+        </div>
+        {data.timeSlots.map((slot) => (
+          <div className="schedule-row" key={slot.code}>
+            <div className="schedule-slot">
+              <strong>{slot.label}</strong>
+              <span>
+                {slot.start} - {slot.end}
+              </span>
+            </div>
+            {data.weekdays.map((day) => {
+              const entries = detailEntries.filter((entry) => entry.weekday === day.index && entry.periodCode === slot.code);
+              return (
+                <div className={cn("schedule-cell", entries.length && "is-occupied")} key={`${day.index}-${slot.code}`}>
+                  {entries.length ? (
+                    <ExpandableScheduleEntries
+                      entries={entries}
+                      renderEntry={(entry, index) => (
+                        <EntityScheduleCell
+                          key={`${entry.courseName}-${entry.teacher}-${entry.classGroup}-${entry.roomName}-${index}`}
+                          entry={entry}
+                          view={entity.view}
+                          room={roomByName.get(entry.roomName)}
+                          onNavigate={onNavigate}
+                          onOpenRoom={onOpenRoom}
+                        />
+                      )}
+                    />
+                  ) : (
+                    <span className="schedule-free">无课</span>
                   )}
                 </div>
               );
@@ -1259,7 +1740,6 @@ function CommandDialog({
   commandQuery,
   setCommandQuery,
   onPickRoom,
-  onPickAction,
   availableRooms,
   courseResults,
 }) {
@@ -1295,33 +1775,6 @@ function CommandDialog({
     return hits;
   }, [data, normalizedQuery]);
 
-  const quickActions = [
-    {
-      label: "定位现在",
-      description: "回到当前日期、星期和节次",
-      icon: CalendarDays,
-      action: () => onPickAction("today"),
-    },
-    {
-      label: "切到查询教室",
-      description: "回到默认首页视图",
-      icon: LayoutGrid,
-      action: () => onPickAction("available"),
-    },
-    {
-      label: "切到查询课程",
-      description: "按课程 / 教师 / 班级搜索",
-      icon: BookOpen,
-      action: () => onPickAction("courses"),
-    },
-    {
-      label: "清空筛选",
-      description: "重置楼栋、楼层、区域和关键词",
-      icon: Filter,
-      action: () => onPickAction("reset"),
-    },
-  ];
-
   return (
     <Modal open={open} onOpenChange={onOpenChange} className="dialog dialog-command">
       <div className="command-bar">
@@ -1339,68 +1792,51 @@ function CommandDialog({
 
       <div className="command-body">
         {!normalizedQuery ? (
-          <>
-            <div className="command-group">
-              <div className="command-group-title">快速操作</div>
-              <div className="command-list">
-                {quickActions.map((item) => (
-                  <button className="command-item" key={item.label} onClick={item.action} type="button">
-                    <span className="command-item-icon">
-                      <item.icon size={15} />
+          <div className="command-group command-columns">
+            <div>
+              <div className="command-group-title">查询教室结果</div>
+              <div className="command-list compact">
+                {availableRooms.slice(0, 8).map((room) => (
+                  <button className="command-item" key={room.name} onClick={() => onPickRoom(room)} type="button">
+                    <span className="command-item-icon soft">
+                      <DoorOpen size={15} />
                     </span>
                     <span className="command-item-copy">
-                      <strong>{item.label}</strong>
-                      <small>{item.description}</small>
+                      <strong>{room.name}</strong>
+                      <small>
+                        {room.building} · {room.floor} 层
+                      </small>
                     </span>
                   </button>
                 ))}
+                {!availableRooms.length ? <div className="command-empty">当前没有查询教室结果</div> : null}
               </div>
             </div>
-
-            <div className="command-group command-columns">
-              <div>
-                <div className="command-group-title">查询教室</div>
-                <div className="command-list compact">
-                  {availableRooms.slice(0, 8).map((room) => (
-                    <button className="command-item" key={room.name} onClick={() => onPickRoom(room)} type="button">
-                      <span className="command-item-icon soft">
-                        <DoorOpen size={15} />
-                      </span>
-                      <span className="command-item-copy">
-                        <strong>{room.name}</strong>
-                        <small>
-                          {room.building} · {room.floor} 层
-                        </small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="command-group-title">课程结果</div>
-                <div className="command-list compact">
-                  {courseResults.slice(0, 8).map(({ entry, room }, index) => (
-                    <button
-                      className="command-item"
-                      key={`${room.name}-${entry.courseName}-${index}`}
-                      onClick={() => onPickRoom(room)}
-                      type="button"
-                    >
-                      <span className="command-item-icon soft">
-                        <BookOpen size={15} />
-                      </span>
-                      <span className="command-item-copy">
-                        <strong>{entry.courseName}</strong>
-                        <small>
-                          {entry.teacher || "未标注教师"} · {room.name}
-                        </small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
+            <div>
+              <div className="command-group-title">课程结果</div>
+              <div className="command-list compact">
+                {courseResults.slice(0, 8).map(({ entry, room }, index) => (
+                  <button
+                    className="command-item"
+                    key={`${room.name}-${entry.courseName}-${index}`}
+                    onClick={() => onPickRoom(room)}
+                    type="button"
+                  >
+                    <span className="command-item-icon soft">
+                      <BookOpen size={15} />
+                    </span>
+                    <span className="command-item-copy">
+                      <strong>{entry.courseName}</strong>
+                      <small>
+                        {entry.teacher || "未标注教师"} · {room.name}
+                      </small>
+                    </span>
+                  </button>
+                ))}
+                {!courseResults.length ? <div className="command-empty">输入关键词搜索课程</div> : null}
               </div>
             </div>
-          </>
+          </div>
         ) : (
           <div className="command-group">
             <div className="command-group-title">
@@ -1460,7 +1896,7 @@ function LoadingScreen({ progress, stage }) {
             <DoorOpen size={19} strokeWidth={2.2} />
           </div>
           <div>
-            <strong>教室查询 · ZSC</strong>
+            <strong>校园课程助手 · ZSC</strong>
             <span>正在准备数据</span>
           </div>
           <LoaderCircle className="loader" size={18} />
@@ -1491,6 +1927,7 @@ function LoadingScreen({ progress, stage }) {
 function App() {
   const isMac = typeof window !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
   const [data, setData] = useState(null);
+  const [scheduleData, setScheduleData] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -1509,6 +1946,7 @@ function App() {
   const [selectedZones, setSelectedZones] = useState([]);
   const [query, setQuery] = useState("");
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [selectedEntity, setSelectedEntity] = useState(null);
   const [isDark, setIsDark] = useState(false);
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -1519,7 +1957,9 @@ function App() {
   });
   const [recentQueries, setRecentQueries] = useState(() => {
     const value = readStorage(RECENT_QUERIES_STORAGE_KEY, []);
-    return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
+    return Array.isArray(value)
+      ? value.filter((item) => item && typeof item === "object" && (item.activeView === "available" || item.entityLabel))
+      : [];
   });
   const [filtersVisible, setFiltersVisible] = useState(true);
   const [urlInitialized, setUrlInitialized] = useState(false);
@@ -1531,22 +1971,33 @@ function App() {
 
     async function loadResources() {
       try {
-        setLoadStage("正在加载教室数据...");
+        setLoadStage("正在加载数据文件...");
         const dataValue = await fetchJsonWithProgress(DATA_URL, (progress) => {
           if (!cancelled) {
             setLoadProgress(progress * 0.86);
-            setLoadStage(`正在加载教室数据 ${Math.round(progress * 100)}%`);
+            setLoadStage(`正在加载数据文件 ${Math.round(progress * 100)}%`);
           }
         });
 
         if (cancelled) return;
         setData(dataValue);
-        setLoadStage("正在读取网站配置...");
+        setLoadStage("正在加载课程索引...");
+
+        const scheduleValue = await fetchJsonWithProgress(SCHEDULE_URL, (progress) => {
+          if (!cancelled) {
+            setLoadProgress(0.86 + progress * 0.07);
+            setLoadStage(`正在加载课程索引 ${Math.round(progress * 100)}%`);
+          }
+        });
+
+        if (cancelled) return;
+        setScheduleData(scheduleValue);
+        setLoadStage("正在初始化...");
 
         const settingsValue = await fetchJsonWithProgress(SETTINGS_URL, (progress) => {
           if (!cancelled) {
-            setLoadProgress(0.86 + progress * 0.14);
-            setLoadStage(`正在读取网站配置 ${Math.round(progress * 100)}%`);
+            setLoadProgress(0.93 + progress * 0.07);
+            setLoadStage(`正在初始化 ${Math.round(progress * 100)}%`);
           }
         });
 
@@ -1602,6 +2053,9 @@ function App() {
   }, []);
 
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [showResultsJump, setShowResultsJump] = useState(false);
+  const queryPanelRef = useRef(null);
+  const resultsSectionRef = useRef(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentNow(new Date()), 1000);
@@ -1640,7 +2094,7 @@ function App() {
     if (!data || !settingsLoaded || urlInitialized) return;
 
     const params = new URLSearchParams(window.location.search);
-    const hasSharedState = ["view", "mode", "week", "weekday", "date", "periods", "periodMode", "available", "buildings", "floors", "zones", "q"]
+    const hasSharedState = ["view", "mode", "week", "weekday", "date", "periods", "periodMode", "available", "buildings", "floors", "zones", "q", "entity"]
       .some((key) => params.has(key));
     const shared = getQuerySnapshotFromUrl(window.location.search);
     const validPeriods = shared.selectedPeriods.filter((code) => data.timeSlots.some((slot) => slot.code === code));
@@ -1649,7 +2103,7 @@ function App() {
     if (hasSharedState) {
       const validWeek = clamp(shared.selectedWeek, 1, data.summary.maxWeek);
       const validWeekday = clamp(shared.selectedWeekday, 1, data.weekdays.length);
-      setActiveView(shared.activeView);
+      setActiveView(normalizeView(shared.activeView));
       setPeriodSelectionMode(shared.periodSelectionMode);
       setSelectedPeriods(shared.periodSelectionMode === "single" ? [nextPeriods[0]] : nextPeriods);
       setOnlyAvailable(shared.onlyAvailable);
@@ -1669,6 +2123,7 @@ function App() {
 
       setQuery(shared.query);
       setSelectedFloors(shared.selectedFloors);
+      setSelectedEntity(shared.entityLabel ? { view: normalizeView(shared.activeView), label: shared.entityLabel } : null);
     } else {
       const defaultMode = settings.defaultPeriodMode === "multiple" ? "multiple" : "single";
       setActiveView(settings.defaultView === "courses" ? "courses" : "available");
@@ -1722,6 +2177,21 @@ function App() {
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
       const progress = scrollHeight > 0 ? scrollTop / scrollHeight : 0;
       setScrollProgress(Number.isFinite(progress) ? clamp(progress, 0, 1) : 0);
+
+      const queryPanel = queryPanelRef.current;
+      const resultsSection = resultsSectionRef.current;
+      if (window.innerWidth <= 720 && queryPanel && resultsSection) {
+        const queryRect = queryPanel.getBoundingClientRect();
+        const resultsRect = resultsSection.getBoundingClientRect();
+        setShowResultsJump(
+          filtersVisible
+          && queryRect.top <= window.innerHeight - 72
+          && queryRect.bottom >= 72
+          && resultsRect.top > window.innerHeight - 40,
+        );
+      } else {
+        setShowResultsJump(false);
+      }
     };
 
     updateScrollProgress();
@@ -1731,7 +2201,7 @@ function App() {
       window.removeEventListener("scroll", updateScrollProgress);
       window.removeEventListener("resize", updateScrollProgress);
     };
-  }, []);
+  }, [filtersVisible]);
 
   const filteredRooms = useMemo(() => {
     if (!data) return [];
@@ -1758,40 +2228,56 @@ function App() {
     [filteredRooms, selectedPeriods, selectedWeek, selectedWeekday],
   );
 
+  const roomByName = useMemo(() => new Map((data?.rooms ?? []).map((room) => [room.name, room])), [data]);
   const courseResults = useMemo(() => {
-    if (!data) return [];
+    if (!data || !scheduleData) return [];
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return [];
 
-    const matches = [];
-    for (const room of data.rooms) {
-      if (selectedBuildings.length > 0 && !selectedBuildings.includes(room.building)) continue;
-      if (selectedFloors.length > 0 && !selectedFloors.includes(room.floor)) continue;
-      if (selectedZones.length > 0 && !selectedZones.includes(room.zone)) continue;
+    return (scheduleData.courseEntries ?? []).filter((entry) => {
+      const room = roomByName.get(entry.roomName);
+      if (!entry.courseName?.toLowerCase().includes(normalizedQuery)) return false;
+      if (selectedBuildings.length && (!room || !selectedBuildings.includes(room.building))) return false;
+      if (selectedFloors.length && (!room || !selectedFloors.includes(room.floor))) return false;
+      if (selectedZones.length && (!room || !selectedZones.includes(room.zone))) return false;
+      return true;
+    }).map((entry) => ({ entry, room: roomByName.get(entry.roomName) }));
+  }, [data, query, roomByName, scheduleData, selectedBuildings, selectedFloors, selectedZones]);
 
-      for (const entry of room.entries) {
-        const searchText = [
-          entry.courseName,
-          entry.teacher,
-          entry.classGroup,
-          room.name,
-          room.building,
-          room.zone,
-        ]
-          .join(" ")
-          .toLowerCase();
+  const courseCards = useMemo(() => {
+    const grouped = new Map();
+    courseResults.forEach(({ entry }) => {
+      if (!grouped.has(entry.courseName)) grouped.set(entry.courseName, []);
+      grouped.get(entry.courseName).push(entry);
+    });
+    return [...grouped.entries()]
+      .sort(([left], [right]) => left.localeCompare(right, "zh-Hans-u-co-pinyin"))
+      .map(([label, entries]) => ({ label, entries }));
+  }, [courseResults]);
 
-        if (!searchText.includes(normalizedQuery)) continue;
-        if (!entry.weeks.includes(Number(selectedWeek))) continue;
-        if (entry.weekday !== Number(selectedWeekday)) continue;
-        if (!selectedPeriods.includes(entry.periodCode)) continue;
+  const directoryResults = useMemo(() => {
+    if (!scheduleData || !["courses", "teachers", "classes"].includes(activeView)) return [];
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return [];
+    const sourceEntries = getScheduleSourceEntries(scheduleData, activeView);
 
-        matches.push({ entry, room });
-      }
-    }
+    const grouped = new Map();
+    sourceEntries.forEach((entry) => {
+      const target = getScheduleEntityValue(entry, activeView);
+      if (!target?.toLowerCase().includes(normalizedQuery)) return;
 
-    return matches;
-  }, [data, query, selectedBuildings, selectedFloors, selectedZones, selectedPeriods, selectedWeek, selectedWeekday]);
+      const room = roomByName.get(entry.roomName);
+      if (selectedBuildings.length && (!room || !selectedBuildings.includes(room.building))) return false;
+      if (selectedFloors.length && (!room || !selectedFloors.includes(room.floor))) return false;
+      if (selectedZones.length && (!room || !selectedZones.includes(room.zone))) return false;
+      if (!grouped.has(target)) grouped.set(target, []);
+      grouped.get(target).push(entry);
+    });
+
+    return [...grouped.entries()]
+      .sort(([left], [right]) => left.localeCompare(right, "zh-Hans-u-co-pinyin"))
+      .map(([label, entries]) => ({ label, entries }));
+  }, [activeView, query, roomByName, scheduleData, selectedBuildings, selectedFloors, selectedZones]);
 
   const displayRooms = onlyAvailable ? availableRooms : filteredRooms;
   const roomGroups = useMemo(() => groupRoomsByBuildingAndFloor(displayRooms), [displayRooms]);
@@ -1827,6 +2313,7 @@ function App() {
         selectedFloors,
         selectedZones,
         query,
+        entityLabel: selectedEntity?.label ?? "",
       }),
     [
       activeView,
@@ -1841,6 +2328,7 @@ function App() {
       selectedFloors,
       selectedZones,
       query,
+      selectedEntity?.label,
     ],
   );
 
@@ -1856,6 +2344,8 @@ function App() {
   useEffect(() => {
     if (!urlInitialized) return undefined;
 
+    if (activeView !== "available") return undefined;
+
     const timer = window.setTimeout(() => {
       setRecentQueries((current) => {
         const serialized = JSON.stringify(querySnapshot);
@@ -1869,7 +2359,7 @@ function App() {
     }, 650);
 
     return () => window.clearTimeout(timer);
-  }, [querySnapshot, urlInitialized]);
+  }, [activeView, querySnapshot, urlInitialized]);
 
   function resetFilters() {
     setQuery("");
@@ -1893,6 +2383,8 @@ function App() {
     setSelectedPeriods([defaultTemporal.period]);
     setPeriodSelectionMode(defaultMode);
     setOnlyAvailable(settings.defaultOnlyAvailable !== false);
+    setSelectedEntity(null);
+    setSelectedRoom(null);
     resetFilters();
   }
 
@@ -1904,6 +2396,8 @@ function App() {
     setSelectedPeriods([today.period]);
     setTemporalMode("date");
     setActiveView("available");
+    setSelectedEntity(null);
+    setSelectedRoom(null);
   }
 
   function handleDateChange(value) {
@@ -1931,7 +2425,9 @@ function App() {
 
   function applyRecentQuery(snapshot) {
     if (!snapshot) return;
-    setActiveView(snapshot.activeView === "courses" ? "courses" : "available");
+    setActiveView(normalizeView(snapshot.activeView));
+    setSelectedEntity(snapshot.entityLabel ? { view: normalizeView(snapshot.activeView), label: snapshot.entityLabel } : null);
+    setSelectedRoom(null);
     setTemporalMode(snapshot.temporalMode === "date" ? "date" : "week");
     setSelectedWeek(clamp(Number(snapshot.selectedWeek) || DEFAULT_WEEK, 1, data.summary.maxWeek));
     setSelectedWeekday(clamp(Number(snapshot.selectedWeekday) || DEFAULT_WEEKDAY, 1, data.weekdays.length));
@@ -1959,23 +2455,44 @@ function App() {
     });
   }
 
-  function handleCommandAction(action) {
-    if (action === "today") {
-      useToday();
-    } else if (action === "available") {
-      setActiveView("available");
-    } else if (action === "courses") {
-      setActiveView("courses");
-    } else if (action === "reset") {
-      resetFilters();
-      setCommandQuery("");
-    }
+  function openRoom(room) {
+    setSelectedRoom(room);
+    setSelectedEntity(null);
     setCommandOpen(false);
   }
 
-  function openRoom(room) {
-    setSelectedRoom(room);
+  function changeView(view) {
+    setActiveView(normalizeView(view));
+    setQuery("");
+    setSelectedRoom(null);
+    setSelectedEntity(null);
+  }
+
+  function navigateToEntity(view, label) {
+    if (!label) return;
+    const nextView = normalizeView(view);
+    setSelectedRoom(null);
+    setActiveView(nextView);
+    setQuery(label);
+    setSelectedEntity({ view: nextView, label });
     setCommandOpen(false);
+  }
+
+  function openEntityCard(view, label) {
+    if (!label) return;
+    const nextView = normalizeView(view);
+    saveRecentQuery({
+      ...querySnapshot,
+      activeView: nextView,
+      query: label,
+      entityLabel: label,
+    });
+    navigateToEntity(nextView, label);
+  }
+
+  function openRoomFromEntity(room) {
+    setSelectedEntity(null);
+    openRoom(room);
   }
 
   if (loadError) {
@@ -2006,14 +2523,14 @@ function App() {
             <DoorOpen size={19} strokeWidth={2.2} />
           </div>
           <div>
-            <strong>教室查询</strong>
+            <strong>校园课程助手</strong>
             <span>ZSC</span>
           </div>
         </a>
         <div className="topbar-actions">
           {settings.enableCommandPalette ? (
             <button className="button button-outline topbar-command" onClick={() => setCommandOpen(true)} type="button">
-              <Command size={15} />
+              <Search size={15} />
               <span>搜索</span>
               <kbd>{isMac ? "⌘ K" : "Ctrl + K"}</kbd>
             </button>
@@ -2042,14 +2559,14 @@ function App() {
         <section className="hero">
           <div className="hero-copy">
             <div className="eyebrow">
-              <Sparkles size={14} /> 开放教室查询
+              <Sparkles size={14} /> 校园课程助手
             </div>
             <h1>
-              找到一个
+              查课程
               <br />
-              <em>适合使用</em>的教室
+              <em>看课表</em>，找教室
             </h1>
-            <p>查找教室，支持日期定位、节次多选、楼栋分组和查询课程。</p>
+            <p>课程、教师、班级与教室，一站式查询。</p>
             <div className="hero-meta" aria-label="更新时间">
               <div className="hero-meta-item">
                 <Clock3 size={15} />
@@ -2079,12 +2596,12 @@ function App() {
         <NotificationCenter notifications={notifications} />
 
         {filtersVisible ? (
-          <section className={cn("query-panel", settings.stickyFilters && "is-sticky")}>
+          <section ref={queryPanelRef} className={cn("query-panel", settings.stickyFilters && "is-sticky")}>
           <div className="panel-topline">
             <div className="view-tabs">
               <button
                 className={cn("view-tab", activeView === "available" && "is-active")}
-                onClick={() => setActiveView("available")}
+                onClick={() => changeView("available")}
                 type="button"
               >
                 <LayoutGrid size={16} />
@@ -2092,70 +2609,91 @@ function App() {
               </button>
               <button
                 className={cn("view-tab", activeView === "courses" && "is-active")}
-                onClick={() => setActiveView("courses")}
+                onClick={() => changeView("courses")}
                 type="button"
               >
                 <BookOpen size={16} />
                 查询课程
               </button>
+              <button
+                className={cn("view-tab", activeView === "teachers" && "is-active")}
+                onClick={() => changeView("teachers")}
+                type="button"
+              >
+                <UserRound size={16} />
+                查询教师
+              </button>
+              <button
+                className={cn("view-tab", activeView === "classes" && "is-active")}
+                onClick={() => changeView("classes")}
+                type="button"
+              >
+                <Users size={16} />
+                查询班级
+              </button>
             </div>
             <div className="panel-actions">
-              <button className="button button-outline panel-now-button" onClick={useToday} type="button">
-                现在
-              </button>
-              {settings.enableCommandPalette ? (
-                <button className="button button-primary" onClick={() => setCommandOpen(true)} type="button">
-                  <Search size={14} />
-                  快速搜索
-                </button>
-              ) : null}
               <button
-                className="icon-button filter-visibility-button"
+                className="button button-outline filter-visibility-button"
                 onClick={() => setFiltersVisible(false)}
                 type="button"
                 aria-label="隐藏筛选栏"
                 title="隐藏筛选栏"
               >
                 <EyeOff size={16} />
+                隐藏筛选
               </button>
             </div>
           </div>
 
-          <div className="query-fields">
-            <TemporalPicker
-              mode={temporalMode}
-              onModeChange={setTemporalMode}
-              selectedWeek={selectedWeek}
-              selectedWeekday={selectedWeekday}
-              selectedDate={selectedDate}
-              onWeekChange={(value) => {
-                setSelectedWeek(value);
-                setTemporalMode("week");
-              }}
-              onWeekdayChange={(value) => {
-                setSelectedWeekday(value);
-                setTemporalMode("week");
-              }}
-              onDateChange={handleDateChange}
-              weekdays={data.weekdays}
-              maxWeek={data.summary.maxWeek}
-              dateRange={dateRange}
-            />
-            <PeriodPicker
-              timeSlots={data.timeSlots}
-              selectedPeriods={selectedPeriods}
-              selectionMode={periodSelectionMode}
-              onModeChange={handlePeriodModeChange}
-              onChange={setSelectedPeriods}
-            />
+          <div className={cn("query-fields", activeView !== "available" && "is-directory-query") }>
+            {activeView === "available" ? (
+              <>
+                <TemporalPicker
+                  onToday={useToday}
+                  mode={temporalMode}
+                  onModeChange={setTemporalMode}
+                  selectedWeek={selectedWeek}
+                  selectedWeekday={selectedWeekday}
+                  selectedDate={selectedDate}
+                  onWeekChange={(value) => {
+                    setSelectedWeek(value);
+                    setTemporalMode("week");
+                  }}
+                  onWeekdayChange={(value) => {
+                    setSelectedWeekday(value);
+                    setTemporalMode("week");
+                  }}
+                  onDateChange={handleDateChange}
+                  weekdays={data.weekdays}
+                  maxWeek={data.summary.maxWeek}
+                  dateRange={dateRange}
+                />
+                <PeriodPicker
+                  timeSlots={data.timeSlots}
+                  selectedPeriods={selectedPeriods}
+                  selectionMode={periodSelectionMode}
+                  onModeChange={handlePeriodModeChange}
+                  onChange={setSelectedPeriods}
+                />
+              </>
+            ) : null}
             <label className="search-field">
-              <span className="field-label">{activeView === "courses" ? "搜索课程 / 教师 / 班级" : "搜索教室"}</span>
+              <span className="field-label">{getViewSearchLabel(activeView)}</span>
               <span className="search-input-wrap">
                 <Search size={17} />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder={activeView === "courses" ? "例如：高等数学、张老师、计算机..." : "输入教室号或楼栋..."}
+                  placeholder={
+                    activeView === "available"
+                      ? "输入教室号或楼栋..."
+                      : activeView === "courses"
+                        ? "例如：高等数学、张老师、计算机..."
+                        : activeView === "teachers"
+                          ? "例如：张老师、王教授..."
+                          : "例如：电科23A、26计科AB...(可能需要尝试不同的关键词)"
+                  }
                 />
                 {query ? (
                   <button className="clear-search" onClick={() => setQuery("")} type="button" aria-label="清空搜索">
@@ -2208,7 +2746,7 @@ function App() {
           </div>
           </section>
         ) : (
-          <div className={cn("filter-collapsed-bar", settings.stickyFilters && "is-sticky")}>
+          <div ref={queryPanelRef} className={cn("filter-collapsed-bar", settings.stickyFilters && "is-sticky")}>
             <span>
               <PanelTop size={15} />
               筛选栏已隐藏
@@ -2259,13 +2797,13 @@ function App() {
           </section>
         ) : null}
 
-        <section className={cn("results-section", settings.infoDisplay === 0 && "is-masked")}>
+        <section ref={resultsSectionRef} className={cn("results-section", settings.infoDisplay === 0 && "is-masked")}>
           <div className="results-content">
             <div className="results-heading">
             <div>
               <div className="section-kicker">
                 <span className="live-pulse" />
-                {activeView === "available" ? `实时${onlyAvailable ? "可用" : ""}情况` : "课程结果"}
+                {activeView === "available" ? `实时${onlyAvailable ? "可用" : ""}情况` : `${getViewLabel(activeView)}结果`}
               </div>
               <h2>
                 {activeView === "available"
@@ -2278,8 +2816,14 @@ function App() {
                 {activeView === "available"
                   ? `第 ${selectedWeek} 周 · ${activeSlots.length ? `${activeSlots[0].start} - ${activeSlots[activeSlots.length - 1].end}` : ""}`
                   : query
-                    ? `当前仅统计第 ${selectedWeek} 周 ${activeDay?.shortLabel} ${activePeriodLabel} 的课程安排`
-                    : "支持课程名称、教师姓名、班级和教室编号"}
+                    ? activeView === "courses"
+                      ? "已忽略周次、星期和节次，点击课程卡片查看完整周课表"
+                      : activeView === "teachers"
+                        ? "已忽略周次、星期和节次，点击教师卡片查看完整周课表"
+                        : "已忽略周次、星期和节次，点击班级卡片查看完整周课表"
+                    : activeView === "courses"
+                      ? "搜索课程名称"
+                      : `搜索${activeView === "teachers" ? "教师姓名" : "行政班名称"}`}
               </p>
             </div>
             {activeView === "available" ? (
@@ -2343,21 +2887,43 @@ function App() {
                   <EmptyState hasQuery={hasFilters} onReset={resetFilters} />
                 )}
               </>
-            ) : (
+            ) : activeView === "courses" ? (
               <div className="course-results">
-                {courseResults.length ? (
-                  courseResults.slice(0, settings.searchResultLimit).map(({ entry, room }, index) => (
-                    <CourseRow
-                      key={`${room.name}-${entry.courseName}-${entry.periodCode}-${index}`}
-                      entry={entry}
-                      room={room}
-                      onOpen={setSelectedRoom}
+                {courseCards.length ? (
+                  courseCards.slice(0, settings.searchResultLimit).map(({ label, entries }) => (
+                    <EntityResultCard
+                      key={label}
+                      view="courses"
+                      label={label}
+                      entries={entries}
+                      onOpen={openEntityCard}
                     />
                   ))
                 ) : (
-                  <EmptyState hasQuery={Boolean(query)} onReset={() => setQuery("")} />
+                  <DirectoryEmptyState view="courses" hasQuery={Boolean(query)} onReset={() => setQuery("")} />
                 )}
-                {courseResults.length > settings.searchResultLimit ? (
+                {courseCards.length > settings.searchResultLimit ? (
+                  <p className="result-limit">
+                    结果较多，仅展示前 {settings.searchResultLimit} 条，请继续缩小搜索范围。
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="course-results">
+                {directoryResults.length ? (
+                  directoryResults.slice(0, settings.searchResultLimit).map(({ label, entries }) => (
+                    <EntityResultCard
+                      key={label}
+                      view={activeView}
+                      label={label}
+                      entries={entries}
+                      onOpen={openEntityCard}
+                    />
+                  ))
+                ) : (
+                  <DirectoryEmptyState view={activeView} hasQuery={Boolean(query)} onReset={() => setQuery("")} />
+                )}
+                {directoryResults.length > settings.searchResultLimit ? (
                   <p className="result-limit">
                     结果较多，仅展示前 {settings.searchResultLimit} 条，请继续缩小搜索范围。
                   </p>
@@ -2410,6 +2976,30 @@ function App() {
         onClose={() => setSelectedRoom(null)}
         isFavorite={selectedRoom ? favoriteSet.has(selectedRoom.name) : false}
         onToggleFavorite={toggleFavorite}
+        onNavigate={navigateToEntity}
+      />
+
+      <EntityScheduleDialog
+        entity={selectedEntity}
+        scheduleData={scheduleData}
+        data={data}
+        selectedWeek={selectedWeek}
+        selectedWeekday={selectedWeekday}
+        selectedPeriods={selectedPeriods}
+        currentNow={currentNow}
+        currentTemporal={currentTemporal}
+        maxWeek={data.summary.maxWeek}
+        roomByName={roomByName}
+        onClose={() => setSelectedEntity(null)}
+          onWeekChange={(week) => {
+          setSelectedWeek(clamp(week, 1, data.summary.maxWeek));
+          setTemporalMode("week");
+        }}
+        onFilterChange={(key, value) => {
+          setSelectedEntity((current) => current ? { ...current, [key]: value } : current);
+        }}
+        onNavigate={navigateToEntity}
+        onOpenRoom={openRoomFromEntity}
       />
 
       <NotificationCenterDialog
@@ -2426,7 +3016,6 @@ function App() {
           commandQuery={commandQuery}
           setCommandQuery={setCommandQuery}
           onPickRoom={openRoom}
-          onPickAction={handleCommandAction}
           availableRooms={availableRooms}
           courseResults={courseResults}
         />
@@ -2447,6 +3036,20 @@ function App() {
           </span>
         </button>
       ) : null}
+
+      <button
+        className={cn("back-to-top results-jump", showResultsJump && "is-visible")}
+        type="button"
+        aria-label="查看查询结果"
+        title="查看查询结果"
+        onClick={() => resultsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+      >
+        <span className="back-to-top-ring" aria-hidden="true">
+          <span className="back-to-top-core">
+            <Check size={16} className="results-check" />
+          </span>
+        </span>
+      </button>
     </div>
   );
 }
