@@ -1897,7 +1897,7 @@ function LoadingScreen({ progress, stage }) {
           </div>
           <div>
             <strong>校园课程助手 · ZSC</strong>
-            <span>正在准备数据</span>
+            <span>正在准备数据,首次加载可能需要较长时间</span>
           </div>
           <LoaderCircle className="loader" size={18} />
         </div>
@@ -2952,18 +2952,14 @@ function App() {
 
         <div className="footer-row">
           <a 
-            href="https://github.com/TifeCide" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="footer-link"
-          >
-            <Github size={16} />
-            <span>TifeCide</span>
+          href="https://github.com/TifeCide" target="_blank" rel="noopener noreferrer" className="footer-link"><
+          Github size={16} />
+          <span>TifeCide</span>
           </a>
         </div>
 
         <div className="footer-row footer-powered">
-          <span>Powered by GitHub Pages</span>
+          <p>Powered by GitHub Pages 51LA</p>
         </div>
       </footer>
 
