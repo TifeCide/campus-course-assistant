@@ -44,8 +44,10 @@ const DISMISSED_NOTIFICATIONS_STORAGE_KEY = "classroom-dismissed-notifications";
 const DEFAULT_WEEK = 1;
 const DEFAULT_WEEKDAY = 1;
 const DEFAULT_PERIOD = "0102";
+const EXAM_WEEK_COUNT = 3;
 const DEFAULT_SETTINGS = {
   semesterStartDate: "",
+  semesterEndDate: "",
   infoDisplay: 1,
   maskMessage: {
     title: "内容已隐藏",
@@ -242,6 +244,32 @@ function getAcademicWeek(date = new Date(), semesterStartDate = "") {
   return Math.max(1, Math.floor(diffDays / 7) + 1);
 }
 
+function getAcademicPhase(date = new Date(), settings = {}) {
+  const semesterStart = parseDateAtShanghaiNoon(settings?.semesterStartDate);
+  const semesterEnd = parseDateAtShanghaiNoon(settings?.semesterEndDate);
+
+  if (!semesterStart || !semesterEnd || semesterEnd < semesterStart) {
+    return null;
+  }
+
+  const parts = getShanghaiParts(date);
+  const current = getShanghaiDate(parts.year, parts.month, parts.day, 12, 0);
+  const examStart = new Date(semesterEnd.getTime() + 24 * 60 * 60 * 1000);
+  const examEnd = new Date(
+    examStart.getTime() + (EXAM_WEEK_COUNT * 7 - 1) * 24 * 60 * 60 * 1000,
+  );
+
+  if (current >= semesterStart && current <= semesterEnd) {
+    return { type: "teaching", label: "" };
+  }
+
+  if (current >= examStart && current <= examEnd) {
+    return { type: "exam", label: "考试周" };
+  }
+
+  return { type: "holiday", label: "假期" };
+}
+
 function getCurrentPeriodCode(timeSlots, date = new Date()) {
   if (!timeSlots?.length) return DEFAULT_PERIOD;
 
@@ -262,10 +290,13 @@ function getCurrentPeriodCode(timeSlots, date = new Date()) {
 function getAutoTemporalState(data, settings, date = new Date()) {
   const parts = getShanghaiParts(date);
   const week = clamp(getAcademicWeek(date, settings?.semesterStartDate), 1, data?.summary?.maxWeek ?? 18);
+  const phase = getAcademicPhase(date, settings);
 
   return {
     week,
     weekday: parts.weekdayIndex,
+    phase: phase?.type ?? "unknown",
+    phaseLabel: phase?.label ?? "",
     period: getCurrentPeriodCode(data?.timeSlots ?? [], date),
     dateLabel: `${parts.year}年${parts.month}月${parts.day}日`,
     timeLabel: parts.timeLabel,
@@ -1526,6 +1557,8 @@ function App() {
           ...settingsValue,
           semesterStartDate:
             typeof settingsValue?.semesterStartDate === "string" ? settingsValue.semesterStartDate : "",
+          semesterEndDate:
+            typeof settingsValue?.semesterEndDate === "string" ? settingsValue.semesterEndDate : "",
           infoDisplay: Number(settingsValue?.infoDisplay ?? DEFAULT_SETTINGS.infoDisplay),
           defaultView: settingsValue?.defaultView === "courses" ? "courses" : "available",
           defaultOnlyAvailable: settingsValue?.defaultOnlyAvailable !== false,
@@ -1588,6 +1621,9 @@ function App() {
       .sort((a, b) => a.notifyNo - b.notifyNo),
     [allNotifications, currentDateLabel],
   );
+  const currentPhaseLabel = currentTemporal?.phase === "teaching"
+    ? `第${currentTemporal.week}周`
+    : currentTemporal?.phaseLabel || "";
   const currentDay = data?.weekdays.find((day) => day.index === currentTemporal?.weekday);
 
   const buildings = useMemo(() => getUniqueSorted(data?.rooms.map((room) => room.building) ?? []), [data]);
@@ -2015,7 +2051,7 @@ function App() {
           <div className="hero-note">
             <span>现在是</span>
             <strong>
-              第{currentTemporal?.week ?? ""}周 {currentDay?.shortLabel ?? ""}
+              {currentPhaseLabel} {currentDay?.shortLabel ?? ""}
             </strong>
             <span>
               {currentTime

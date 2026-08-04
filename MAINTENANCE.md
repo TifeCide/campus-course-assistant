@@ -106,6 +106,7 @@ public/data/setting.json
 | 配置项 | 类型 | 作用 |
 | --- | --- | --- |
 | `semesterStartDate` | 字符串 | 学期第一周周一，格式为 `YYYY-MM-DD` |
+| `semesterEndDate` | 字符串 | 教学周最后一天，格式为 `YYYY-MM-DD`；结束后的 3 周显示为考试周 |
 | `infoDisplay` | 数字 | `1` 显示结果，`0` 隐藏结果区域 |
 | `maskMessage.title` | 字符串 | 结果遮罩标题 |
 | `maskMessage.text` | 字符串 | 结果遮罩说明 |

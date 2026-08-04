@@ -1,0 +1,407 @@
+# 课室查询 · ZSC
+
+一个基于 React 和 Vite 的纯前端课室查询系统，用于查询校园教室在指定周次、日期和节次下的空闲情况，也支持按课程、教师和班级检索课表。
+
+项目不需要后端服务或数据库，页面运行时直接读取 `public/data/` 中的 JSON 文件。生产环境可以部署到 GitHub Pages 或其他静态文件服务器。
+
+## 功能
+
+- 查询指定周次、星期和节次的空闲教室
+- 支持按具体日期查询
+- 支持单节次或多节次筛选
+- 支持按楼栋、楼层和区域筛选
+- 支持课程、教师、班级和教室检索
+- 查看教室课程安排、每周概览和下一节课程
+- 收藏教室，并保存最近查询
+- 支持深色模式
+- 支持通知中心和配置化通知
+- 支持命令面板和 `Ctrl / Cmd + K` 快速搜索
+- 查询条件同步到 URL，便于分享和恢复
+- 支持结果区域遮罩
+- 响应式布局，适配桌面端和移动端
+
+## 技术栈
+
+- React 19
+- Vite 6
+- lucide-react
+- 原生 `fetch`、`localStorage` 和浏览器 URL API
+- GitHub Actions + GitHub Pages
+
+## 环境要求
+
+- Node.js 20 或更高版本
+- npm
+
+安装依赖：
+
+```bash
+npm install
+```
+
+CI 和部署环境使用锁定版本安装依赖：
+
+```bash
+npm ci
+```
+
+## 常用命令
+
+启动开发服务器：
+
+```bash
+npm run dev
+```
+
+默认情况下，Vite 会在本地启动开发地址，并在终端输出访问 URL。
+
+解析课表：
+
+```bash
+npm run parse
+```
+
+生产构建：
+
+```bash
+npm run build
+```
+
+本地预览生产构建：
+
+```bash
+npm run preview
+```
+
+解析课表并构建：
+
+```bash
+npm run update-data
+```
+
+推荐在更新课表或准备部署时使用 `npm run update-data`。
+
+## 项目结构
+
+```text
+.
+├─ .github/workflows/deploy-pages.yml   GitHub Pages 部署流程
+├─ public/
+│  └─ data/
+│     ├─ classroom-data.json            解析器生成的课室数据
+│     └─ setting.json                   网站运行配置
+├─ scripts/
+│  └─ parse-classrooms.js               HTML 课表解析器
+├─ src/
+│  ├─ App.jsx                           页面组件和主要业务逻辑
+│  ├─ main.jsx                          React 应用入口
+│  └─ styles.css                        全部页面样式
+├─ CNAME                                GitHub Pages 自定义域名
+├─ index.html                           HTML 入口
+├─ package.json                         脚本和依赖配置
+├─ package-lock.json                    依赖锁定文件
+├─ vite.config.js                       Vite 配置
+└─ README.md                            项目说明
+```
+
+根目录中的 `kbxx_classroom_ifr_*.html` 是课表原始文件。它们是解析器的输入，不是浏览器运行时直接读取的数据。
+
+## 更新课表数据
+
+### 1. 放置原始课表
+
+将新的课表 HTML 文件放到项目根目录，文件名保持以下格式：
+
+```text
+kbxx_classroom_ifr_2026-2027-1.html
+```
+
+解析器会查找所有匹配以下模式的文件：
+
+```text
+kbxx_classroom_ifr_*.html
+```
+
+不带参数运行时，解析器会按文件名排序并自动选择最新文件：
+
+```bash
+npm run parse
+```
+
+如果根目录中有多个课表文件，也可以明确指定输入文件：
+
+```bash
+npm run parse -- kbxx_classroom_ifr_2026-2027-1.html
+```
+
+### 2. 生成前端数据
+
+解析器读取课表中的：
+
+```html
+<table id="kbtable">
+```
+
+并生成：
+
+```text
+public/data/classroom-data.json
+```
+
+解析器支持以下两类 HTML：
+
+1. 教务系统直接保存的原始 HTML。
+2. 浏览器“查看源代码”后保存的、包含 `line-wrap` 包装结构的 HTML。
+
+执行成功后会输出教室数量、课程记录数量和检测到的最大周次。
+
+### 3. 构建并检查
+
+```bash
+npm run update-data
+```
+
+执行后建议检查：
+
+- `public/data/classroom-data.json` 的 `generatedAt`
+- `sourceFile` 是否是预期文件
+- `summary.totalRooms` 是否合理
+- `summary.totalEntries` 是否合理
+- `summary.maxWeek` 是否合理
+
+注意：GitHub Actions 的部署流程不会运行 `npm run parse`，只会构建已经提交到仓库的文件。因此更新课表后必须提交生成后的 `public/data/classroom-data.json`。
+
+## 网站配置
+
+配置文件：
+
+```text
+public/data/setting.json
+```
+
+当前配置字段如下：
+
+| 字段 | 类型 | 作用 |
+| --- | --- | --- |
+| `semesterStartDate` | 字符串 | 学期第一周周一，格式为 `YYYY-MM-DD` |
+| `semesterEndDate` | 字符串 | 教学周最后一天，格式为 `YYYY-MM-DD` |
+| `notify` | 数组 | 通知中心中的通知配置 |
+| `infoDisplay` | 数字 | `1` 显示结果，`0` 对结果区域启用遮罩 |
+| `maskMessage.title` | 字符串 | 结果遮罩标题 |
+| `maskMessage.text` | 字符串 | 结果遮罩说明 |
+| `defaultView` | 字符串 | 默认视图，可选 `available` 或 `courses` |
+| `defaultOnlyAvailable` | 布尔值 | 是否默认只显示空闲教室 |
+| `defaultPeriodMode` | 字符串 | 默认节次模式，可选 `single` 或 `multiple` |
+| `searchResultLimit` | 数字 | 课程检索最多显示的结果数量 |
+| `enableCommandPalette` | 布尔值 | 是否启用命令面板和快速搜索 |
+| `enableBackToTop` | 布尔值 | 是否启用回到顶部按钮 |
+| `stickyFilters` | 布尔值 | 是否启用筛选栏吸顶 |
+| `schoolTimeZone` | 字符串 | 学校时区配置字段，当前时间计算固定使用 `Asia/Shanghai` |
+
+当前配置示例：
+
+```json
+{
+  "semesterStartDate": "2026-08-31",
+  "semesterEndDate": "2026-12-20",
+  "defaultView": "available",
+  "defaultOnlyAvailable": true,
+  "defaultPeriodMode": "single",
+  "searchResultLimit": 75,
+  "enableCommandPalette": true,
+  "enableBackToTop": true,
+  "stickyFilters": true,
+  "schoolTimeZone": "Asia/Shanghai"
+}
+```
+
+### 学期阶段显示
+
+顶部的当前时间提示会根据 `semesterStartDate` 和 `semesterEndDate` 判断阶段：
+
+```text
+教学周：第 n 周 周 x
+教学结束后的连续 3 周：考试周 周 x
+其他日期：假期 周 x
+```
+
+例如当前配置对应：
+
+```text
+2026-08-31 至 2026-12-20：第 1 至 16 周
+2026-12-21 至 2027-01-10：考试周
+其他日期：假期
+```
+
+考试周和假期只是顶部的显示状态。内部课程查询仍使用数字周次，并继续受 `classroom-data.json` 中 `summary.maxWeek` 限制，不会把“考试周”或“假期”作为课程查询周次传入数据层。
+
+### 通知配置
+
+每条通知支持以下字段：
+
+| 字段 | 作用 |
+| --- | --- |
+| `notifyNo` | 通知编号，用于排序和持久化关闭状态 |
+| `notifyType` | `info`、`warning` 或 `error` |
+| `notifyTitle` | 通知标题 |
+| `notifyText` | 通知正文，可使用 `\\n` 换行 |
+| `notifyStartDate` | 生效范围开始日期 |
+| `notifyEndDate` | 生效范围结束日期 |
+| `notifyInDate` | `1` 表示日期范围内显示，`0` 表示日期范围外显示 |
+| `notifyTwice` | 是否允许通知出现两次，当前配置会保留该字段 |
+
+日期使用 `YYYY-MM-DD` 格式，并按当前应用使用的上海时区进行判断。
+
+新增配置字段时，应同步修改：
+
+1. `src/App.jsx` 中的 `DEFAULT_SETTINGS`。
+2. 设置加载时的类型归一化逻辑。
+3. 实际读取该配置的组件或业务逻辑。
+4. 本 README 的配置表。
+
+## 浏览器本地数据
+
+系统使用浏览器 `localStorage` 保存用户侧状态：
+
+| Key | 内容 |
+| --- | --- |
+| `classroom-favorites` | 收藏的教室编号 |
+| `classroom-recent-queries` | 最近查询条件 |
+| `classroom-dismissed-notifications` | 已关闭的通知编号 |
+
+调试时如需清除这些状态，可以在浏览器控制台执行：
+
+```js
+localStorage.removeItem("classroom-favorites");
+localStorage.removeItem("classroom-recent-queries");
+localStorage.removeItem("classroom-dismissed-notifications");
+```
+
+## 构建和部署
+
+### 本地构建
+
+```bash
+npm run build
+```
+
+构建结果位于：
+
+```text
+dist/
+```
+
+`dist/` 已加入 `.gitignore`，不会被提交到仓库。
+
+### GitHub Pages
+
+工作流文件：
+
+```text
+.github/workflows/deploy-pages.yml
+```
+
+当前部署流程如下：
+
+1. 推送到 `main` 分支，或手动触发工作流。
+2. 使用 Node.js 20。
+3. 执行 `npm ci`。
+4. 执行 `npm run build`。
+5. 发布 `dist/` 到 GitHub Pages。
+
+部署前需要确认：
+
+- `public/data/classroom-data.json` 已经是最新版本。
+- `public/data/setting.json` 已经包含当前学期配置。
+- GitHub 仓库的 Pages 发布源配置为 GitHub Actions。
+- 如果使用自定义域名，`CNAME` 内容和域名 DNS 配置正确。
+
+## 修改代码时的入口
+
+主要业务逻辑集中在 `src/App.jsx`：
+
+| 区域 | 主要内容 |
+| --- | --- |
+| 日期和周次函数 | `getAcademicWeek`、`getAcademicPhase`、`getRoomDateValue`、`getTemporalFromDate` |
+| 数据加载 | `fetchJsonWithProgress` 及 `App` 内的资源加载逻辑 |
+| 空闲教室筛选 | `getRoomEntries`、`getRoomEntriesForPeriods`、`filteredRooms`、`availableRooms` |
+| 课程检索 | `courseResults` 及 `CommandDialog` |
+| 教室卡片和详情 | `RoomCard`、`RoomDialog` |
+| 时间选择 | `TemporalPicker`、`PeriodPicker` |
+| 通知 | `normalizeNotification`、`NotificationCenter`、`NotificationCenterDialog` |
+| URL 和最近查询 | `createQuerySnapshot`、`getQuerySnapshotFromUrl`、`getQueryUrl` |
+
+修改筛选、时间或数据结构后，至少运行：
+
+```bash
+npm run build
+```
+
+如果修改了课表解析器，还应运行：
+
+```bash
+npm run parse
+```
+
+并检查生成数据的摘要信息。
+
+## 常见问题
+
+### 页面显示旧课表
+
+依次检查：
+
+1. `public/data/classroom-data.json` 是否已经更新。
+2. `dist/data/classroom-data.json` 是否已经更新。
+3. 浏览器是否需要强制刷新。
+4. 静态服务器是否缓存了旧 JSON 文件。
+
+建议对以下文件设置较短缓存时间，或在重新部署后主动刷新缓存：
+
+```text
+/data/classroom-data.json
+/data/setting.json
+```
+
+### 解析器提示找不到课表
+
+确认根目录存在匹配以下格式的文件：
+
+```text
+kbxx_classroom_ifr_*.html
+```
+
+并确认 HTML 中包含：
+
+```html
+<table id="kbtable">
+```
+
+### 页面加载失败
+
+确认以下文件能够通过部署后的静态路径访问：
+
+```text
+data/classroom-data.json
+data/setting.json
+```
+
+同时检查浏览器开发者工具中的网络请求和 JSON 格式。
+
+## 快速更新清单
+
+更新一个新学期的课表时：
+
+```text
+1. 将新的 kbxx_classroom_ifr_*.html 放到项目根目录。
+2. 修改 public/data/setting.json 中的 semesterStartDate 和 semesterEndDate。
+3. 执行 npm run update-data。
+4. 检查解析输出和 public/data/classroom-data.json 的 summary。
+5. 执行 npm run build，确认构建通过。
+6. 提交源课表、生成后的 JSON、配置和代码变更。
+7. 推送到 main，等待 GitHub Pages 工作流完成。
+```
+
+## 许可和数据说明
+
+本项目是一个校园课室查询前端。课室占用信息根据教务系统课程安排整理生成，不保证反映临时调课、考试安排、活动申请等实时变化。实际使用前应以现场情况和学校最新通知为准。
