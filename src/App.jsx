@@ -821,7 +821,7 @@ function EmptyState({ hasQuery, onReset }) {
       <div className="empty-mark">
         <DoorOpen size={28} strokeWidth={1.5} />
       </div>
-      <h3>{hasQuery ? "没有符合条件的课室" : "当前时段暂无空闲课室"}</h3>
+      <h3>{hasQuery ? "没有符合条件的教室" : "当前时段暂无空闲教室"}</h3>
       <p>
         {hasQuery
           ? "试试减少筛选条件，或切换楼栋、楼层和区域。"
@@ -1107,7 +1107,7 @@ function RoomDialog({
     <Modal open={Boolean(room)} onOpenChange={onClose} className="dialog dialog-room">
       <div className="dialog-header">
         <div>
-          <div className="eyebrow">课室详情</div>
+          <div className="eyebrow">教室详情</div>
           <h2>{room.name}</h2>
           <p>
             <MapPin size={14} />
@@ -1296,7 +1296,7 @@ function CommandDialog({
       action: () => onPickAction("today"),
     },
     {
-      label: "切到空闲课室",
+      label: "切到空闲教室",
       description: "回到默认首页视图",
       icon: LayoutGrid,
       action: () => onPickAction("available"),
@@ -1323,7 +1323,7 @@ function CommandDialog({
           ref={inputRef}
           value={commandQuery}
           onChange={(event) => setCommandQuery(event.target.value)}
-          placeholder="搜索课室、楼栋、课程、教师或班级"
+          placeholder="搜索教室、楼栋、课程、教师或班级"
         />
         <span className="command-shortcut">
           <Command size={12} /> K
@@ -1352,7 +1352,7 @@ function CommandDialog({
 
             <div className="command-group command-columns">
               <div>
-                <div className="command-group-title">空闲课室</div>
+                <div className="command-group-title">空闲教室</div>
                 <div className="command-list compact">
                   {availableRooms.slice(0, 8).map((room) => (
                     <button className="command-item" key={room.name} onClick={() => onPickRoom(room)} type="button">
@@ -1453,7 +1453,7 @@ function LoadingScreen({ progress, stage }) {
             <DoorOpen size={19} strokeWidth={2.2} />
           </div>
           <div>
-            <strong>课室查询 · ZSC</strong>
+            <strong>教室查询 · ZSC</strong>
             <span>正在准备数据</span>
           </div>
           <LoaderCircle className="loader" size={18} />
@@ -1524,11 +1524,11 @@ function App() {
 
     async function loadResources() {
       try {
-        setLoadStage("正在加载课室数据...");
+        setLoadStage("正在加载教室数据...");
         const dataValue = await fetchJsonWithProgress(DATA_URL, (progress) => {
           if (!cancelled) {
             setLoadProgress(progress * 0.86);
-            setLoadStage(`正在加载课室数据 ${Math.round(progress * 100)}%`);
+            setLoadStage(`正在加载教室数据 ${Math.round(progress * 100)}%`);
           }
         });
 
@@ -1977,7 +1977,8 @@ function App() {
         <div className="load-card">
           <CircleHelp size={30} />
           <h1>数据加载失败</h1>
-          <p>{loadError}，请确认 `public/data/classroom-data.json` 存在。</p>
+          <p>{loadError}.<br />如多次出现此问题，请联系<a href="https://github.com/TifeCide" target="_blank" rel="noopener noreferrer">开发者</a>。
+          </p>
           <button className="button button-primary" onClick={() => window.location.reload()} type="button">
             重新加载
           </button>
@@ -1998,7 +1999,7 @@ function App() {
             <DoorOpen size={19} strokeWidth={2.2} />
           </div>
           <div>
-            <strong>课室查询</strong>
+            <strong>教室查询</strong>
             <span>ZSC</span>
           </div>
         </a>
@@ -2039,7 +2040,7 @@ function App() {
         <section className="hero">
           <div className="hero-copy">
             <div className="eyebrow">
-              <Sparkles size={14} /> 开放课室查询
+              <Sparkles size={14} /> 开放教室查询
             </div>
             <h1>
               找到一个
@@ -2073,7 +2074,7 @@ function App() {
                 type="button"
               >
                 <LayoutGrid size={16} />
-                空闲课室
+                空闲教室
               </button>
               <button
                 className={cn("view-tab", activeView === "courses" && "is-active")}
@@ -2134,13 +2135,13 @@ function App() {
               onChange={setSelectedPeriods}
             />
             <label className="search-field">
-              <span className="field-label">{activeView === "courses" ? "搜索课程 / 教师 / 班级" : "搜索课室"}</span>
+              <span className="field-label">{activeView === "courses" ? "搜索课程 / 教师 / 班级" : "搜索教室"}</span>
               <span className="search-input-wrap">
                 <Search size={17} />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder={activeView === "courses" ? "例如：高等数学、张老师、计算机..." : "输入课室号或楼栋..."}
+                  placeholder={activeView === "courses" ? "例如：高等数学、张老师、计算机..." : "输入教室号或楼栋..."}
                 />
                 {query ? (
                   <button className="clear-search" onClick={() => setQuery("")} type="button" aria-label="清空搜索">
@@ -2254,7 +2255,7 @@ function App() {
               </div>
               <h2>
                 {activeView === "available"
-                  ? `${activeDay?.shortLabel} ${activePeriodLabel} 的${onlyAvailable ? "空闲" : "全部"}课室`
+                  ? `${activeDay?.shortLabel} ${activePeriodLabel} 的${onlyAvailable ? "空闲" : "全部"}教室`
                   : query
                     ? `“${query}”的检索结果`
                     : "输入关键词开始检索"}
@@ -2264,7 +2265,7 @@ function App() {
                   ? `第 ${selectedWeek} 周 · ${activeSlots.length ? `${activeSlots[0].start} - ${activeSlots[activeSlots.length - 1].end}` : ""}`
                   : query
                     ? `当前仅统计第 ${selectedWeek} 周 ${activeDay?.shortLabel} ${activePeriodLabel} 的课程安排`
-                    : "支持课程名称、教师姓名、班级和课室编号"}
+                    : "支持课程名称、教师姓名、班级和教室编号"}
               </p>
             </div>
             {activeView === "available" ? (
@@ -2278,7 +2279,7 @@ function App() {
             {activeView === "available" ? (
               <>
                 <div className="stats-grid">
-                  <StatCard icon={DoorOpen} label={onlyAvailable ? "空闲课室" : "匹配课室"} value={displayRooms.length} detail="当前筛选范围内" tone="green" />
+                  <StatCard icon={DoorOpen} label={onlyAvailable ? "空闲教室" : "匹配教室"} value={displayRooms.length} detail="当前筛选范围内" tone="green" />
                   <StatCard icon={Building2} label="涉及楼栋" value={new Set(displayRooms.map((room) => room.building)).size} detail={`共 ${buildings.length} 栋`} tone="blue" />
                   <StatCard icon={Clock3} label="当前时段" value={activePeriodLabel} detail={selectedPeriods.length > 1 ? "多节次筛选" : `${activeSlots[0]?.start ?? ""} - ${activeSlots[0]?.end ?? ""}`} tone="orange" />
                   <StatCard icon={Filter} label="已占用" value={occupiedCount} detail="当前筛选范围内" tone="slate" />
