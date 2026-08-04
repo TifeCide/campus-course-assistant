@@ -14,6 +14,7 @@ import {
   Clock3,
   Command,
   Copy,
+  Database,
   DoorOpen,
   Eye,
   EyeOff,
@@ -68,6 +69,7 @@ const DEFAULT_MASK_MESSAGE = {
   text: "当前 infoDisplay = 0，results-section 已按配置遮罩。",
 };
 const SHANGHAI_TZ = "Asia/Shanghai";
+const BUILD_TIME = __BUILD_TIME__;
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -146,17 +148,22 @@ function dismissNotificationPersistently(notificationKey) {
   writeStorage(DISMISSED_NOTIFICATIONS_STORAGE_KEY, dismissed);
 }
 
-function formatDataUpdatedAt(value) {
+function formatDateTime(value) {
   if (!value) return "未知";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "未知";
-  return date.toLocaleString("zh-CN", {
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: SHANGHAI_TZ,
     year: "numeric",
-    month: "numeric",
-    day: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-  });
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
 }
 
 function clamp(value, min, max) {
@@ -821,7 +828,7 @@ function EmptyState({ hasQuery, onReset }) {
       <div className="empty-mark">
         <DoorOpen size={28} strokeWidth={1.5} />
       </div>
-      <h3>{hasQuery ? "没有符合条件的教室" : "当前时段暂无空闲教室"}</h3>
+      <h3>{hasQuery ? "没有符合条件的教室" : "当前时段暂无符合条件的教室"}</h3>
       <p>
         {hasQuery
           ? "试试减少筛选条件，或切换楼栋、楼层和区域。"
@@ -1296,13 +1303,13 @@ function CommandDialog({
       action: () => onPickAction("today"),
     },
     {
-      label: "切到空闲教室",
+      label: "切到查询教室",
       description: "回到默认首页视图",
       icon: LayoutGrid,
       action: () => onPickAction("available"),
     },
     {
-      label: "切到课程检索",
+      label: "切到查询课程",
       description: "按课程 / 教师 / 班级搜索",
       icon: BookOpen,
       action: () => onPickAction("courses"),
@@ -1352,7 +1359,7 @@ function CommandDialog({
 
             <div className="command-group command-columns">
               <div>
-                <div className="command-group-title">空闲教室</div>
+                <div className="command-group-title">查询教室</div>
                 <div className="command-list compact">
                   {availableRooms.slice(0, 8).map((room) => (
                     <button className="command-item" key={room.name} onClick={() => onPickRoom(room)} type="button">
@@ -2011,11 +2018,6 @@ function App() {
               <kbd>{isMac ? "⌘ K" : "Ctrl + K"}</kbd>
             </button>
           ) : null}
-          <div className="data-status">
-            <span className="status-dot" />
-            <span>数据正常</span>
-            <small>更新于 {formatDataUpdatedAt(data.generatedAt)}</small>
-          </div>
           <button
             className="icon-button notification-center-button"
             onClick={() => setNotificationCenterOpen(true)}
@@ -2047,7 +2049,19 @@ function App() {
               <br />
               <em>适合使用</em>的教室
             </h1>
-            <p>默认展示空教室，支持日期定位、节次多选、楼栋分组和课程检索。</p>
+            <p>查找教室，支持日期定位、节次多选、楼栋分组和查询课程。</p>
+            <div className="hero-meta" aria-label="更新时间">
+              <div className="hero-meta-item">
+                <Clock3 size={15} />
+                <span>系统更新时间</span>
+                <time dateTime={BUILD_TIME}>{formatDateTime(BUILD_TIME)}</time>
+              </div>
+              <div className="hero-meta-item">
+                <Database size={15} />
+                <span>数据更新时间</span>
+                <time dateTime={data.generatedAt}>{formatDateTime(data.generatedAt)}</time>
+              </div>
+            </div>
           </div>
           <div className="hero-note">
             <span>现在是</span>
@@ -2074,7 +2088,7 @@ function App() {
                 type="button"
               >
                 <LayoutGrid size={16} />
-                空闲教室
+                查询教室
               </button>
               <button
                 className={cn("view-tab", activeView === "courses" && "is-active")}
@@ -2082,7 +2096,7 @@ function App() {
                 type="button"
               >
                 <BookOpen size={16} />
-                课程检索
+                查询课程
               </button>
             </div>
             <div className="panel-actions">
@@ -2367,7 +2381,7 @@ function App() {
 
       <footer className="footer">
         <div className="footer-row">
-          <span>数据更新于 {formatDataUpdatedAt(data.generatedAt)}</span>
+          <span>数据更新于 {formatDateTime(data.generatedAt)}</span>
         </div>
 
         <div className="footer-row">

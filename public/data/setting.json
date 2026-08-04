@@ -29,7 +29,7 @@
     "text": "数据维护中，请稍后再试。"
   },
   "defaultView": "available",
-  "defaultOnlyAvailable": true,
+  "defaultOnlyAvailable": false,
   "defaultPeriodMode": "single",
   "searchResultLimit": 75,
   "enableCommandPalette": true,

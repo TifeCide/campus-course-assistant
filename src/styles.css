@@ -109,7 +109,6 @@ input {
 
 .brand,
 .topbar-actions,
-.data-status,
 .brand > div:last-child,
 .filter-title,
 .group-title,
@@ -159,18 +158,6 @@ input {
   gap: 10px;
 }
 
-.data-status {
-  gap: 7px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.data-status small {
-  color: var(--muted-foreground);
-  font-size: 10px;
-}
-
-.status-dot,
 .live-pulse {
   display: inline-block;
   width: 7px;
@@ -178,6 +165,14 @@ input {
   border-radius: 50%;
   background: #39b77e;
   box-shadow: 0 0 0 4px rgb(57 183 126 / 13%);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #39b77e;
 }
 
 .icon-button {
@@ -295,6 +290,34 @@ input {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
+}
+
+.hero-meta {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hero-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.hero-meta-item svg {
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.hero-meta-item span {
+  color: var(--muted);
+}
+
+.hero-meta-item time {
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
 }
 
 .hero-note {
@@ -1625,10 +1648,12 @@ input {
   color: #f3f7fd;
 }
 
-.dark .brand span,
-.dark .data-status,
-.dark .data-status small {
+.dark .brand span {
   color: #c5d0df;
+}
+
+.dark .hero-meta-item time {
+  color: #e5edf8;
 }
 
 .dark .hero h1,
@@ -1788,10 +1813,6 @@ input {
   .topbar {
     height: 62px;
     padding: 0 18px;
-  }
-
-  .data-status {
-    display: none;
   }
 
   .page-content {
@@ -1962,16 +1983,23 @@ input {
 
 .dark .query-panel .reset-button,
 .dark .query-panel .reset-all-button {
-  color: var(--foreground);
-  border-color: var(--border-strong);
-  background: var(--card);
+  color: #dbeafe;
+  border-color: #4d6380;
+  background: #22314a;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
 }
 
 .dark .query-panel .reset-button:hover,
 .dark .query-panel .reset-all-button:hover {
   color: #dbeafe;
   border-color: #5d9ef4;
-  background: var(--primary-soft);
+  background: #2a4770;
+}
+
+.dark .query-panel .reset-button:focus-visible,
+.dark .query-panel .reset-all-button:focus-visible {
+  outline: 2px solid #78aef6;
+  outline-offset: 2px;
 }
 
 .multi-select-field {
@@ -2975,14 +3003,6 @@ input {
 
 .brand span {
   font-size: 9px;
-}
-
-.data-status {
-  font-size: 13px;
-}
-
-.data-status small {
-  font-size: 11px;
 }
 
 .eyebrow,
