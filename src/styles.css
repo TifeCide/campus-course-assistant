@@ -3147,6 +3147,21 @@ input {
 }
 
 @media (max-width: 720px) {
+  .overlay {
+    padding: 0;
+  }
+
+  .dialog:not(.notification-dialog):not(.notification-center-dialog) {
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   .panel-topline {
     align-items: flex-start;
     flex-direction: column;
