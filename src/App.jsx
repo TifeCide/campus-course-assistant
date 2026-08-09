@@ -1,6 +1,6 @@
 import React, { Component, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-//从 lucide-react 导入所需的图标组件
+/*从 lucide-react 导入所需的图标组件 */
 import {
   ArrowUpRight,
   ArrowUp,
@@ -39,18 +39,18 @@ import {
   Github,
 } from "lucide-react";
 
-//使用不同的资源源可以提高访问速度和稳定性，尤其是在不同地区的用户访问时：
+/*使用不同的资源源可以提高访问速度和稳定性，尤其是在不同地区的用户访问时： */
 const GITHUB_USER = 'TifeCide';
 const GITHUB_REPO = 'campus-course-assistant';
 const RESOURCE_SOURCES = {
-  // Cloudflare Pages
+  /* Cloudflare Pages */
   CF: import.meta.env.BASE_URL,
   
-  //JsDelivr CDN
+  /*JsDelivr CDN */
   JSD:
     `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}@main/public/`,
   
-  // GitHub Pages
+  /* GitHub Pages */
   GHP:
     `https://tifecide.github.io/${GITHUB_REPO}/`,
 };
@@ -74,7 +74,7 @@ const SETTINGS_URLS = [
   `${RESOURCE_SOURCES.GHP}data/setting.json`,
 ];
 
-// 按当前 public/data 文件大小估算整体加载进度，避免小设置文件占用虚假的进度比例。
+/* 按当前 public/data 文件大小估算整体加载进度，避免小设置文件占用虚假的进度比例。 */
 const LOAD_RESOURCE_SIZE_ESTIMATES = {
   data: 6_843_889,
   schedule: 5_797_967,
@@ -87,18 +87,18 @@ const LOAD_RESOURCE_OFFSETS = {
   settings: LOAD_RESOURCE_SIZE_ESTIMATES.data + LOAD_RESOURCE_SIZE_ESTIMATES.schedule,
 };
 
-//浏览器LocalStorage的键名，用于存储用户的收藏教室、最近查询和已关闭的通知等信息：
+/*浏览器LocalStorage的键名，用于存储用户的收藏教室、最近查询和已关闭的通知等信息： */
 const FAVORITES_STORAGE_KEY = "classroom-favorites";
 const RECENT_QUERIES_STORAGE_KEY = "classroom-recent-queries";
 const DISMISSED_NOTIFICATIONS_STORAGE_KEY = "classroom-dismissed-notifications";
 
-//默认的周次、星期几和节次设置，以及考试周的数量：
+/*默认的周次、星期几和节次设置，以及考试周的数量： */
 const DEFAULT_WEEK = 1;
 const DEFAULT_WEEKDAY = 1;
 const DEFAULT_PERIOD = "0102";
 const EXAM_WEEK_COUNT = 3;
 
-//默认的应用设置，包括学期开始和结束日期、信息显示模式、默认视图、搜索结果限制等：
+/*默认的应用设置，包括学期开始和结束日期、信息显示模式、默认视图、搜索结果限制等： */
 const DEFAULT_SETTINGS = {
   semesterStartDate: "",
   semesterEndDate: "",
@@ -126,7 +126,7 @@ const BUILD_TIME = __BUILD_TIME__;
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
-//读取和写入浏览器的 LocalStorage，处理 JSON 数据，并提供默认值以防止错误：
+/*读取和写入浏览器的 LocalStorage，处理 JSON 数据，并提供默认值以防止错误： */
 function readStorage(key, fallback) {
   try {
     const value = window.localStorage.getItem(key);
@@ -136,26 +136,26 @@ function readStorage(key, fallback) {
   }
 }
 
-// 写入 LocalStorage 时，使用 JSON.stringify 将值转换为字符串，并捕获可能的错误（例如在隐私模式下或嵌入环境中 LocalStorage 不可用）：
+/* 写入 LocalStorage 时，使用 JSON.stringify 将值转换为字符串，并捕获可能的错误（例如在隐私模式下或嵌入环境中 LocalStorage 不可用）： */
 function writeStorage(key, value) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Storage may be unavailable in private browsing or restricted embeds.
+    /* Storage may be unavailable in private browsing or restricted embeds. */
   }
 }
 
-// 获取通知类型，如果传入的值不是 "info"、"warning" 或 "error"，则默认返回 "info"：
+/* 获取通知类型，如果传入的值不是 "info"、"warning" 或 "error"，则默认返回 "info"： */
 function getNotificationType(value) {
   return ["info", "warning", "error"].includes(value) ? value : "info";
 }
 
-// 检查通知是否启用了双重提醒，接受布尔值或数字 1 表示启用：
+/* 检查通知是否启用了双重提醒，接受布尔值或数字 1 表示启用： */
 function isNotificationTwiceEnabled(value) {
   return value === true || Number(value) === 1;
 }
 
-// 将通知对象标准化为统一的格式，确保所有必需字段存在且有效，并返回一个包含通知信息的对象：
+/* 将通知对象标准化为统一的格式，确保所有必需字段存在且有效，并返回一个包含通知信息的对象： */
 function normalizeNotification(value) {
   if (!value || typeof value !== "object") return null;
 
@@ -186,14 +186,14 @@ function normalizeNotification(value) {
   };
 }
 
-// 检查通知是否在指定日期范围内触发，默认使用当前日期。根据通知的开始和结束日期以及是否在日期范围内显示，返回布尔值：
+/* 检查通知是否在指定日期范围内触发，默认使用当前日期。根据通知的开始和结束日期以及是否在日期范围内显示，返回布尔值： */
 function isNotificationTriggered(notification, date = new Date()) {
   const currentDate = getShanghaiParts(date).dateLabel;
   const inRange = currentDate >= notification.notifyStartDate && currentDate <= notification.notifyEndDate;
   return notification.notifyInDate === 1 ? inRange : !inRange;
 }
 
-// 获取已关闭通知的键集合，从 LocalStorage 中读取数据并返回一个 Set 对象，确保只包含字符串类型的键：
+/* 获取已关闭通知的键集合，从 LocalStorage 中读取数据并返回一个 Set 对象，确保只包含字符串类型的键： */
 function getDismissedNotificationKeys() {
   const value = readStorage(DISMISSED_NOTIFICATIONS_STORAGE_KEY, {});
   if (Array.isArray(value)) return new Set(value.filter((key) => typeof key === "string"));
@@ -201,7 +201,7 @@ function getDismissedNotificationKeys() {
   return new Set(Object.keys(value).filter((key) => value[key] === true));
 }
 
-// 将通知标记为已关闭，并将其键存储在 LocalStorage 中，以便在后续访问中不再显示该通知：
+/* 将通知标记为已关闭，并将其键存储在 LocalStorage 中，以便在后续访问中不再显示该通知： */
 function dismissNotificationPersistently(notificationKey) {
   const value = readStorage(DISMISSED_NOTIFICATIONS_STORAGE_KEY, {});
   const dismissed = value && !Array.isArray(value) && typeof value === "object" ? value : {};
@@ -209,7 +209,7 @@ function dismissNotificationPersistently(notificationKey) {
   writeStorage(DISMISSED_NOTIFICATIONS_STORAGE_KEY, dismissed);
 }
 
-// 将日期时间值格式化为 "YYYY-MM-DD HH:mm:ss" 的字符串，使用上海时区进行格式化。如果输入值无效或无法解析，则返回 "未知"：
+/* 将日期时间值格式化为 "YYYY-MM-DD HH:mm:ss" 的字符串，使用上海时区进行格式化。如果输入值无效或无法解析，则返回 "未知"： */
 function formatDateTime(value) {
   if (!value) return "未知";
   const date = new Date(value);
@@ -228,7 +228,7 @@ function formatDateTime(value) {
   return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
 }
 
-// 将数值限制在指定的最小值和最大值之间，如果数值小于最小值则返回最小值，大于最大值则返回最大值，否则返回原始数值：
+/* 将数值限制在指定的最小值和最大值之间，如果数值小于最小值则返回最小值，大于最大值则返回最大值，否则返回原始数值： */
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
@@ -240,18 +240,18 @@ function getOverallLoadProgress(resourceKey, progress) {
   return clamp((resourceOffset + resourceSize * normalizedProgress) / LOAD_TOTAL_SIZE, 0, 1);
 }
 
-// 将数值格式化为两位数的字符串，如果数值小于 10，则在前面补零：
+/* 将数值格式化为两位数的字符串，如果数值小于 10，则在前面补零： */
 function pad2(value) {
   return String(value).padStart(2, "0");
 }
 
-// 将时间字符串（格式为 "HH:mm"）转换为总分钟数，方便进行时间比较和计算：
+/* 将时间字符串（格式为 "HH:mm"）转换为总分钟数，方便进行时间比较和计算： */
 function timeToMinutes(time) {
   const [hours, minutes] = String(time).split(":").map(Number);
   return hours * 60 + minutes;
 }
 
-// 获取指定日期在上海时区的各个时间部分，包括年、月、日、小时、分钟、星期几索引以及格式化的日期和时间标签。如果无法使用国际化 API，则使用本地时间作为回退：
+/* 获取指定日期在上海时区的各个时间部分，包括年、月、日、小时、分钟、星期几索引以及格式化的日期和时间标签。如果无法使用国际化 API，则使用本地时间作为回退： */
 function getShanghaiParts(date = new Date()) {
   try {
     const formatter = new Intl.DateTimeFormat("en-US", {
@@ -292,12 +292,12 @@ function getShanghaiParts(date = new Date()) {
   }
 }
 
-// 创建一个指定日期和时间的上海时区 Date 对象，使用 ISO 8601 格式的字符串表示，并在末尾添加 "+08:00" 时区偏移：
+/* 创建一个指定日期和时间的上海时区 Date 对象，使用 ISO 8601 格式的字符串表示，并在末尾添加 "+08:00" 时区偏移： */
 function getShanghaiDate(year, month, day, hour = 0, minute = 0) {
   return new Date(`${year}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:${pad2(minute)}:00+08:00`);
 }
 
-// 获取指定年份的九月的第一个星期一，如果九月一日不是星期一，则向后查找直到找到第一个星期一：
+/* 获取指定年份的九月的第一个星期一，如果九月一日不是星期一，则向后查找直到找到第一个星期一： */
 function getFirstMondayOfSeptember(year) {
   let candidate = getShanghaiDate(year, 9, 1);
   for (let index = 0; index < 7; index += 1) {
@@ -307,7 +307,7 @@ function getFirstMondayOfSeptember(year) {
   return candidate;
 }
 
-// 将日期字符串（格式为 "YYYY-MM-DD"）解析为上海时区的 Date 对象，并将时间设置为中午 12 点。如果输入无效或无法解析，则返回 null：
+/* 将日期字符串（格式为 "YYYY-MM-DD"）解析为上海时区的 Date 对象，并将时间设置为中午 12 点。如果输入无效或无法解析，则返回 null： */
 function parseDateAtShanghaiNoon(value) {
   if (!value) return null;
   const normalized = String(value).trim();
@@ -316,7 +316,7 @@ function parseDateAtShanghaiNoon(value) {
   return getShanghaiDate(Number(match[1]), Number(match[2]), Number(match[3]), 12, 0);
 }
 
-// 根据指定的日期和学期开始日期，计算当前的学术周次。如果当前日期在学期开始之前，则返回第 1 周；否则，根据日期差计算当前周次，并确保返回值不小于 1：
+/* 根据指定的日期和学期开始日期，计算当前的学术周次。如果当前日期在学期开始之前，则返回第 1 周；否则，根据日期差计算当前周次，并确保返回值不小于 1： */
 function getAcademicWeek(date = new Date(), semesterStartDate = "") {
   const parts = getShanghaiParts(date);
   const termStart = parseDateAtShanghaiNoon(semesterStartDate) ?? getFirstMondayOfSeptember(parts.year);
@@ -328,7 +328,7 @@ function getAcademicWeek(date = new Date(), semesterStartDate = "") {
   return Math.max(1, Math.floor(diffDays / 7) + 1);
 }
 
-// 根据指定的日期和学期设置，确定当前的学术阶段（教学周、考试周或假期）。如果当前日期在学期开始和结束之间，则返回教学阶段；如果在考试周范围内，则返回考试阶段；否则，返回假期阶段：
+/* 根据指定的日期和学期设置，确定当前的学术阶段（教学周、考试周或假期）。如果当前日期在学期开始和结束之间，则返回教学阶段；如果在考试周范围内，则返回考试阶段；否则，返回假期阶段： */
 function getAcademicPhase(date = new Date(), settings = {}) {
   const semesterStart = parseDateAtShanghaiNoon(settings?.semesterStartDate);
   const semesterEnd = parseDateAtShanghaiNoon(settings?.semesterEndDate);
@@ -355,7 +355,7 @@ function getAcademicPhase(date = new Date(), settings = {}) {
   return { type: "holiday", label: "假期" };
 }
 
-// 根据当前时间和提供的时间段列表，确定当前所在的节次代码。如果当前时间不在任何时间段内，则返回下一个即将开始的节次代码；如果没有下一个节次，则返回最后一个节次代码：
+/* 根据当前时间和提供的时间段列表，确定当前所在的节次代码。如果当前时间不在任何时间段内，则返回下一个即将开始的节次代码；如果没有下一个节次，则返回最后一个节次代码： */
 function getCurrentPeriodCode(timeSlots, date = new Date()) {
   if (!timeSlots?.length) return DEFAULT_PERIOD;
 
@@ -373,7 +373,7 @@ function getCurrentPeriodCode(timeSlots, date = new Date()) {
   return upcomingSlot?.code ?? timeSlots[timeSlots.length - 1].code;
 }
 
-// 根据提供的数据、设置和日期，自动生成当前的学术周次、星期几、学术阶段、节次代码以及格式化的日期和时间标签。返回一个包含这些信息的对象：
+/* 根据提供的数据、设置和日期，自动生成当前的学术周次、星期几、学术阶段、节次代码以及格式化的日期和时间标签。返回一个包含这些信息的对象： */
 function getAutoTemporalState(data, settings, date = new Date()) {
   const parts = getShanghaiParts(date);
   const week = clamp(getAcademicWeek(date, settings?.semesterStartDate), 1, data?.summary?.maxWeek ?? 18);
@@ -390,17 +390,17 @@ function getAutoTemporalState(data, settings, date = new Date()) {
   };
 }
 
-// 获取指定教室在特定周次、星期几和节次代码下的所有课程条目。如果教室或相关数据不存在，则返回一个空数组：
+/* 获取指定教室在特定周次、星期几和节次代码下的所有课程条目。如果教室或相关数据不存在，则返回一个空数组： */
 function getRoomEntries(room, weekday, periodCode, week) {
   return room?.slots?.[String(weekday)]?.[periodCode]?.filter((entry) => entry.weeks.includes(Number(week))) ?? [];
 }
 
-// 获取指定教室在特定周次、星期几和多个节次代码下的所有课程条目。通过调用 getRoomEntries 函数并将结果展平为一个数组返回：
+/* 获取指定教室在特定周次、星期几和多个节次代码下的所有课程条目。通过调用 getRoomEntries 函数并将结果展平为一个数组返回： */
 function getRoomEntriesForPeriods(room, weekday, periodCodes, week) {
   return periodCodes.flatMap((periodCode) => getRoomEntries(room, weekday, periodCode, week));
 }
 
-// 异步函数，用于从指定的 URL 获取 JSON 数据，并在下载过程中提供进度回调。如果响应不包含内容长度或流式读取不可用，则直接解析 JSON；否则，使用流式读取并计算下载进度，最终返回解析后的 JSON 对象：
+/* 异步函数，用于从指定的 URL 获取 JSON 数据，并在下载过程中提供进度回调。如果响应不包含内容长度或流式读取不可用，则直接解析 JSON；否则，使用流式读取并计算下载进度，最终返回解析后的 JSON 对象： */
 async function fetchJsonWithProgress(url, onProgress) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`加载失败：${url}`);
@@ -459,7 +459,7 @@ async function fetchJsonFromUrls(urls, { onProgress, onFallback } = {}) {
   throw lastError ?? new Error("加载失败");
 }
 
-// 创建一个查询快照对象，包含当前的视图、时间模式、选定的周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个包含这些信息的对象：
+/* 创建一个查询快照对象，包含当前的视图、时间模式、选定的周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个包含这些信息的对象： */
 function createQuerySnapshot({
   activeView,
   temporalMode,
@@ -492,7 +492,7 @@ function createQuerySnapshot({
   };
 }
 
-// 从 URL 查询字符串中解析出查询快照对象，提取视图、时间模式、周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个包含这些信息的对象：
+/* 从 URL 查询字符串中解析出查询快照对象，提取视图、时间模式、周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个包含这些信息的对象： */
 function getQuerySnapshotFromUrl(search) {
   const params = new URLSearchParams(search);
   const parseList = (key) => params.get(key)?.split(",").filter(Boolean) ?? [];
@@ -516,7 +516,7 @@ function getQuerySnapshotFromUrl(search) {
   };
 }
 
-// 根据视图类型返回对应的标签文本，如果视图类型不在预定义的列表中，则默认返回 "教室"：
+/* 根据视图类型返回对应的标签文本，如果视图类型不在预定义的列表中，则默认返回 "教室"： */
 function getViewLabel(view) {
   return {
     available: "教室",
@@ -526,7 +526,7 @@ function getViewLabel(view) {
   }[view] || "教室";
 }
 
-// 根据视图类型返回对应的搜索标签文本，如果视图类型不在预定义的列表中，则默认返回 "搜索教室"：
+/* 根据视图类型返回对应的搜索标签文本，如果视图类型不在预定义的列表中，则默认返回 "搜索教室"： */
 function getViewSearchLabel(view) {
   return {
     available: "搜索教室",
@@ -536,12 +536,12 @@ function getViewSearchLabel(view) {
   }[view] || "搜索教室";
 }
 
-// 将视图类型标准化为预定义的列表中的值，如果不在列表中，则默认返回 "available"：
+/* 将视图类型标准化为预定义的列表中的值，如果不在列表中，则默认返回 "available"： */
 function normalizeView(value) {
   return ["available", "courses", "teachers", "classes"].includes(value) ? value : "available";
 }
 
-//根据查询快照对象生成对应的 URL 查询字符串，包含视图、时间模式、周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个完整的 URL 字符串，包括路径、查询参数和哈希值：
+/*根据查询快照对象生成对应的 URL 查询字符串，包含视图、时间模式、周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个完整的 URL 字符串，包括路径、查询参数和哈希值： */
 function getQueryUrl(snapshot) {
   const params = new URLSearchParams();
 
@@ -568,7 +568,7 @@ function getQueryUrl(snapshot) {
   return `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
 }
 
-// 根据查询快照对象和数据生成最近查询的标签文本。如果存在实体标签，则返回视图类型和实体标签的组合；否则，根据选定的周次、星期几、节次和位置范围生成一个描述性的标签文本：
+/* 根据查询快照对象和数据生成最近查询的标签文本。如果存在实体标签，则返回视图类型和实体标签的组合；否则，根据选定的周次、星期几、节次和位置范围生成一个描述性的标签文本： */
 function getRecentQueryLabel(snapshot, data) {
   if (snapshot.entityLabel) {
     const viewLabel = snapshot.activeView === "courses" ? "课程" : snapshot.activeView === "teachers" ? "教师" : "班级";
@@ -588,7 +588,7 @@ function getRecentQueryLabel(snapshot, data) {
   return `${time} · ${periods} · ${location}`;
 }
 
-// 获取指定教室在当前时间之后的下一个课程条目。如果教室或数据不存在，则返回 null。通过计算当前节次的位置，并遍历所有时间段和星期几，找到下一个课程条目并返回：
+/* 获取指定教室在当前时间之后的下一个课程条目。如果教室或数据不存在，则返回 null。通过计算当前节次的位置，并遍历所有时间段和星期几，找到下一个课程条目并返回： */
 function getNextCourse(room, data, week, weekday, periodCodes) {
   if (!room || !data) return null;
 
@@ -621,7 +621,7 @@ function getNextCourse(room, data, week, weekday, periodCodes) {
   );
 }
 
-// 获取指定教室在一周内的概览信息，包括每个星期几的总节次、已占用节次和空闲节次。返回一个包含每个星期几概览信息的数组：
+/* 获取指定教室在一周内的概览信息，包括每个星期几的总节次、已占用节次和空闲节次。返回一个包含每个星期几概览信息的数组： */
 function getWeeklyRoomOverview(room, data, week) {
   return data.weekdays.map((day) => {
     const total = data.timeSlots.length;
@@ -637,7 +637,7 @@ function getWeeklyRoomOverview(room, data, week) {
   });
 }
 
-// 根据指定的学术周次、星期几和学期开始日期，计算对应的日期值（格式为 "YYYY-MM-DD"）。如果学期开始日期无效，则使用指定的回退年份来计算九月的第一个星期一作为学期开始日期。返回一个格式化的日期字符串：
+/* 根据指定的学术周次、星期几和学期开始日期，计算对应的日期值（格式为 "YYYY-MM-DD"）。如果学期开始日期无效，则使用指定的回退年份来计算九月的第一个星期一作为学期开始日期。返回一个格式化的日期字符串： */
 function getRoomDateValue(week, weekday, semesterStartDate, fallbackYear = new Date().getFullYear()) {
   const start = parseDateAtShanghaiNoon(semesterStartDate) ?? getFirstMondayOfSeptember(fallbackYear);
   const offsetDays = (Number(week) - 1) * 7 + (Number(weekday) - 1);
@@ -646,7 +646,7 @@ function getRoomDateValue(week, weekday, semesterStartDate, fallbackYear = new D
   return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
 }
 
-// 根据学期开始日期和最大周次，计算学期的日期范围（最小日期和最大日期）。如果学期开始日期无效，则使用指定的回退年份来计算九月的第一个星期一作为学期开始日期。返回一个包含最小日期和最大日期的对象：
+/* 根据学期开始日期和最大周次，计算学期的日期范围（最小日期和最大日期）。如果学期开始日期无效，则使用指定的回退年份来计算九月的第一个星期一作为学期开始日期。返回一个包含最小日期和最大日期的对象： */
 function getDateRange(semesterStartDate, maxWeek, fallbackYear = new Date().getFullYear()) {
   const start = parseDateAtShanghaiNoon(semesterStartDate) ?? getFirstMondayOfSeptember(fallbackYear);
   const end = new Date(start.getTime() + (Number(maxWeek) * 7 - 1) * 24 * 60 * 60 * 1000);
@@ -658,7 +658,7 @@ function getDateRange(semesterStartDate, maxWeek, fallbackYear = new Date().getF
   };
 }
 
-// 根据指定的日期值（格式为 "YYYY-MM-DD"）、学期开始日期和最大周次，计算对应的学术周次和星期几。如果日期值无效或无法解析，则返回 null。返回一个包含学术周次和星期几索引的对象：
+/* 根据指定的日期值（格式为 "YYYY-MM-DD"）、学期开始日期和最大周次，计算对应的学术周次和星期几。如果日期值无效或无法解析，则返回 null。返回一个包含学术周次和星期几索引的对象： */
 function getTemporalFromDate(value, semesterStartDate, maxWeek) {
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -669,7 +669,7 @@ function getTemporalFromDate(value, semesterStartDate, maxWeek) {
   };
 }
 
-// 比较两个教室对象的排序顺序，首先按建筑物名称进行拼音排序，如果建筑物相同，则按楼层数字排序，如果楼层也相同，则按教室名称进行拼音排序。返回一个整数值，用于确定排序顺序：
+/* 比较两个教室对象的排序顺序，首先按建筑物名称进行拼音排序，如果建筑物相同，则按楼层数字排序，如果楼层也相同，则按教室名称进行拼音排序。返回一个整数值，用于确定排序顺序： */
 function compareRooms(a, b) {
   const buildingDiff = a.building.localeCompare(b.building, "zh-Hans-u-co-pinyin");
   if (buildingDiff !== 0) return buildingDiff;
@@ -679,7 +679,7 @@ function compareRooms(a, b) {
 }
 
 
-// 将教室列表按建筑物和楼层进行分组，返回一个包含建筑物、楼层和教室信息的数组。首先按建筑物名称进行拼音排序，然后按楼层数字排序，最后按教室名称进行拼音排序。每个建筑物对象包含楼层信息，每个楼层对象包含对应的教室列表：
+/* 将教室列表按建筑物和楼层进行分组，返回一个包含建筑物、楼层和教室信息的数组。首先按建筑物名称进行拼音排序，然后按楼层数字排序，最后按教室名称进行拼音排序。每个建筑物对象包含楼层信息，每个楼层对象包含对应的教室列表： */
 function groupRoomsByBuildingAndFloor(rooms) {
   const buildingMap = new Map();
 
@@ -710,14 +710,14 @@ function groupRoomsByBuildingAndFloor(rooms) {
     }));
 }
 
-// 获取唯一且排序后的值列表，首先使用 Set 去重，然后按拼音顺序进行排序。如果值是数字或字符串，则按字符串形式进行比较，并使用中文拼音排序规则：
+/* 获取唯一且排序后的值列表，首先使用 Set 去重，然后按拼音顺序进行排序。如果值是数字或字符串，则按字符串形式进行比较，并使用中文拼音排序规则： */
 function getUniqueSorted(values) {
   return [...new Set(values)].sort((a, b) =>
     String(a).localeCompare(String(b), "zh-Hans-u-co-pinyin", { numeric: true }),
   );
 }
 
-// 创建一个选择字段组件，接受标签、值、选项和图标作为属性，并在值变化时调用回调函数。渲染一个带有标签和下拉选择框的表单字段，如果提供了图标，则在选择框前显示图标：
+/* 创建一个选择字段组件，接受标签、值、选项和图标作为属性，并在值变化时调用回调函数。渲染一个带有标签和下拉选择框的表单字段，如果提供了图标，则在选择框前显示图标： */
 function SelectField({ label, value, onChange, options, icon: Icon }) {
   return (
     <label className="field">
@@ -737,7 +737,7 @@ function SelectField({ label, value, onChange, options, icon: Icon }) {
   );
 }
 
-// 创建一个多选字段组件，接受标签、值、选项和图标作为属性，并在值变化时调用回调函数。渲染一个带有标签和下拉菜单的表单字段，允许用户选择多个选项，并在选择框中显示已选择的标签。如果提供了图标，则在选择框前显示图标：
+/* 创建一个多选字段组件，接受标签、值、选项和图标作为属性，并在值变化时调用回调函数。渲染一个带有标签和下拉菜单的表单字段，允许用户选择多个选项，并在选择框中显示已选择的标签。如果提供了图标，则在选择框前显示图标： */
 function MultiSelectField({ label, values, onChange, options, icon: Icon, placeholder = "全部" }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
@@ -802,7 +802,7 @@ function MultiSelectField({ label, values, onChange, options, icon: Icon, placeh
   );
 }
 
-// 创建一个切换开关组件，接受选中状态、变化回调和标签作为属性，并在点击时切换选中状态。渲染一个带有标签和按钮的切换开关，如果选中则显示为激活状态：
+/* 创建一个切换开关组件，接受选中状态、变化回调和标签作为属性，并在点击时切换选中状态。渲染一个带有标签和按钮的切换开关，如果选中则显示为激活状态： */
 function Toggle({ checked, onChange, label }) {
   return (
     <label className="toggle-control">
@@ -819,7 +819,7 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
-// 创建一个时间选择器组件，允许用户在周次模式和日期模式之间切换，并选择特定的周次、星期几或日期。根据当前模式渲染相应的选择字段，并提供快速选择当前时间的按钮：
+/* 创建一个时间选择器组件，允许用户在周次模式和日期模式之间切换，并选择特定的周次、星期几或日期。根据当前模式渲染相应的选择字段，并提供快速选择当前时间的按钮： */
 function TemporalPicker({
   mode,
   onToday,
@@ -890,9 +890,9 @@ function TemporalPicker({
   );
 }
 
-// 创建一个节次选择器组件，允许用户在单选和多选模式之间切换，并选择特定的节次。根据当前模式渲染相应的节次按钮，并在点击时切换选中状态：
+/* 创建一个节次选择器组件，允许用户在单选和多选模式之间切换，并选择特定的节次。根据当前模式渲染相应的节次按钮，并在点击时切换选中状态： */
 function PeriodPicker({ timeSlots, selectedPeriods, selectionMode, onModeChange, onChange }) {
-  // 切换节次的选中状态，根据当前的选择模式（单选或多选）更新选中的节次列表，并调用 onChange 回调函数传递新的选中节次：
+  /* 切换节次的选中状态，根据当前的选择模式（单选或多选）更新选中的节次列表，并调用 onChange 回调函数传递新的选中节次： */
   function togglePeriod(code) {
     if (selectionMode === "single") {
       onChange([code]);
@@ -936,7 +936,7 @@ function PeriodPicker({ timeSlots, selectedPeriods, selectionMode, onModeChange,
   );
 }
 
-// 创建一个统计卡片组件，显示图标、标签、数值和详细信息，并根据指定的色调渲染不同的样式。接受图标组件、标签文本、数值、详细信息和色调作为属性：
+/* 创建一个统计卡片组件，显示图标、标签、数值和详细信息，并根据指定的色调渲染不同的样式。接受图标组件、标签文本、数值、详细信息和色调作为属性： */
 function StatCard({ icon: Icon, label, value, detail, tone = "blue" }) {
   return (
     <div className="stat-card">
@@ -952,7 +952,7 @@ function StatCard({ icon: Icon, label, value, detail, tone = "blue" }) {
   );
 }
 
-// 创建一个教室卡片组件，显示教室的占用状态、名称、建筑物、楼层、区域以及收藏状态。接受教室对象、打开回调函数、选定的周次、星期几、节次、收藏状态和收藏切换回调函数作为属性：
+/* 创建一个教室卡片组件，显示教室的占用状态、名称、建筑物、楼层、区域以及收藏状态。接受教室对象、打开回调函数、选定的周次、星期几、节次、收藏状态和收藏切换回调函数作为属性： */
 function RoomCard({
   room,
   onOpen,
@@ -998,7 +998,7 @@ function RoomCard({
   );
 }
 
-// 创建一个空状态组件，根据是否存在查询条件显示不同的提示信息，并提供清除筛选或搜索的按钮。接受 hasQuery 和 onReset 作为属性：
+/* 创建一个空状态组件，根据是否存在查询条件显示不同的提示信息，并提供清除筛选或搜索的按钮。接受 hasQuery 和 onReset 作为属性： */
 function EmptyState({ hasQuery, onReset }) {
   return (
     <div className="empty-state">
@@ -1020,7 +1020,7 @@ function EmptyState({ hasQuery, onReset }) {
   );
 }
 
-// 创建一个目录空状态组件，根据当前视图类型和是否存在查询条件显示不同的提示信息，并提供清除搜索的按钮。接受 view、hasQuery 和 onReset 作为属性：
+/* 创建一个目录空状态组件，根据当前视图类型和是否存在查询条件显示不同的提示信息，并提供清除搜索的按钮。接受 view、hasQuery 和 onReset 作为属性： */
 function DirectoryEmptyState({ view, hasQuery, onReset }) {
   const label = view === "courses" ? "课程" : view === "teachers" ? "教师" : "班级";
   return (
@@ -1039,7 +1039,7 @@ function DirectoryEmptyState({ view, hasQuery, onReset }) {
   );
 }
 
-// 创建一个实体结果卡片组件，显示实体的图标、标签、课程数、教师数、班级数和教室数，并提供查看周课表的操作。接受视图类型、标签、条目列表和打开回调函数作为属性：
+/* 创建一个实体结果卡片组件，显示实体的图标、标签、课程数、教师数、班级数和教室数，并提供查看周课表的操作。接受视图类型、标签、条目列表和打开回调函数作为属性： */
 function EntityResultCard({ view, label, entries, onOpen }) {
   const courseCount = new Set(entries.map((entry) => entry.courseName).filter(Boolean)).size;
   const teacherCount = new Set(entries.map((entry) => entry.teacher).filter(Boolean)).size;
@@ -1064,7 +1064,7 @@ function EntityResultCard({ view, label, entries, onOpen }) {
   );
 }
 
-// 创建一个实体链接组件，显示实体的标签，并在点击时调用导航回调函数。接受标签、视图类型、导航回调函数、是否静音和自定义类名作为属性：
+/* 创建一个实体链接组件，显示实体的标签，并在点击时调用导航回调函数。接受标签、视图类型、导航回调函数、是否静音和自定义类名作为属性： */
 function EntityLink({ label, view, onNavigate, muted = false, className = "" }) {
   if (!label) return null;
   return (
@@ -1074,7 +1074,7 @@ function EntityLink({ label, view, onNavigate, muted = false, className = "" }) 
   );
 }
 
-// 创建一个课程行组件，显示课程的名称、教室、教师、班级、星期几、节次和周次等信息，并提供打开教室和导航到实体的操作。接受课程条目、教室对象、打开回调函数和导航回调函数作为属性：
+/* 创建一个课程行组件，显示课程的名称、教室、教师、班级、星期几、节次和周次等信息，并提供打开教室和导航到实体的操作。接受课程条目、教室对象、打开回调函数和导航回调函数作为属性： */
 function CourseRow({ entry, room, onOpen, onNavigate }) {
   const roomName = room?.name || entry.roomName || "未标注教室";
   return (
@@ -1109,7 +1109,7 @@ function CourseRow({ entry, room, onOpen, onNavigate }) {
   );
 }
 
-// 创建一个课程行组件，显示课程的名称、教室、教师或班级、星期几、节次和周次等信息，并提供打开教室和导航到实体的操作。根据当前视图类型（教师或班级）显示相应的信息。接受课程条目、教室对象、打开回调函数、导航回调函数和视图类型作为属性：
+/* 创建一个课程行组件，显示课程的名称、教室、教师或班级、星期几、节次和周次等信息，并提供打开教室和导航到实体的操作。根据当前视图类型（教师或班级）显示相应的信息。接受课程条目、教室对象、打开回调函数、导航回调函数和视图类型作为属性： */
 function ScheduleRow({ entry, room, onOpen, onNavigate, view }) {
   const canOpenRoom = Boolean(room);
   const content = (
@@ -1147,7 +1147,7 @@ function ScheduleRow({ entry, room, onOpen, onNavigate, view }) {
   return <div className={cn("course-row", !canOpenRoom && "schedule-row-disabled")}>{content}</div>;
 }
 
-// 创建一个模态对话框组件，接受打开状态、打开状态变化回调、类名和子元素作为属性，并在按下 Escape 键时关闭对话框。使用 createPortal 将对话框渲染到 document.body 中
+/* 创建一个模态对话框组件，接受打开状态、打开状态变化回调、类名和子元素作为属性，并在按下 Escape 键时关闭对话框。使用 createPortal 将对话框渲染到 document.body 中 */
 function Modal({ open, onOpenChange, className, children }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -1170,13 +1170,13 @@ function Modal({ open, onOpenChange, className, children }) {
   );
 }
 
-// 创建一个通知图标组件，根据通知类型（错误、警告或信息）渲染不同的图标，并接受图标大小作为属性：
+/* 创建一个通知图标组件，根据通知类型（错误、警告或信息）渲染不同的图标，并接受图标大小作为属性： */
 function NotificationIcon({ type, size = 18 }) {
   const Icon = type === "error" || type === "warning" ? TriangleAlert : Info;
   return <Icon size={size} />;
 }
 
-// 创建一个通知表面组件，显示通知的标题、文本和剩余时间，并在一定时间后自动关闭。接受通知对象、是否为移动设备和关闭回调函数作为属性：
+/* 创建一个通知表面组件，显示通知的标题、文本和剩余时间，并在一定时间后自动关闭。接受通知对象、是否为移动设备和关闭回调函数作为属性： */
 function NotificationSurface({ notification, isMobile, onDismiss }) {
   const [remaining, setRemaining] = useState(5);
   const [closing, setClosing] = useState(false);
@@ -1214,7 +1214,7 @@ function NotificationSurface({ notification, isMobile, onDismiss }) {
     const timer = window.setTimeout(() => dismissRef.current(), 180);
     return () => window.clearTimeout(timer);
   }, [closing]);
-  // 请求关闭通知，如果已经在关闭过程中，则不执行任何操作。根据设备类型（移动设备或非移动设备）调用相应的关闭方法：
+  /* 请求关闭通知，如果已经在关闭过程中，则不执行任何操作。根据设备类型（移动设备或非移动设备）调用相应的关闭方法： */
   function requestDismiss() {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -1225,7 +1225,7 @@ function NotificationSurface({ notification, isMobile, onDismiss }) {
     }
   }
 
-  // 渲染通知内容，包括图标、标题、文本和剩余时间。如果是移动设备，则显示一个关闭按钮，否则显示一个图标按钮。根据通知类型和关闭状态应用不同的样式类名：
+  /* 渲染通知内容，包括图标、标题、文本和剩余时间。如果是移动设备，则显示一个关闭按钮，否则显示一个图标按钮。根据通知类型和关闭状态应用不同的样式类名： */
   const content = (
     <article className={cn("notification-surface", `notification-${notification.notifyType}`, closing && "is-closing")} role="alert">
       <div className="notification-icon" aria-hidden="true">
@@ -1249,7 +1249,7 @@ function NotificationSurface({ notification, isMobile, onDismiss }) {
       )}
     </article>
   );
-  // 根据设备类型（移动设备或非移动设备）渲染通知内容。如果是移动设备，则使用模态对话框显示通知，否则将通知内容渲染到 document.body 中的一个固定位置：
+  /* 根据设备类型（移动设备或非移动设备）渲染通知内容。如果是移动设备，则使用模态对话框显示通知，否则将通知内容渲染到 document.body 中的一个固定位置： */
   if (isMobile) {
     return (
       <Modal open onOpenChange={requestDismiss} className="dialog notification-dialog">
@@ -1261,7 +1261,7 @@ function NotificationSurface({ notification, isMobile, onDismiss }) {
   return createPortal(<div className="notification-toast-viewport">{content}</div>, document.body);
 }
 
-// 创建一个通知中心对话框组件，显示所有通知的列表，并提供关闭按钮。接受打开状态、通知列表和关闭回调函数作为属性：
+/* 创建一个通知中心对话框组件，显示所有通知的列表，并提供关闭按钮。接受打开状态、通知列表和关闭回调函数作为属性： */
 function NotificationCenterDialog({ open, notifications, onClose }) {
   return (
     <Modal open={open} onOpenChange={onClose} className="dialog notification-center-dialog">
@@ -1305,7 +1305,7 @@ function NotificationCenterDialog({ open, notifications, onClose }) {
   );
 }
 
-// 创建一个居民通知组件，显示所有居民通知的列表，并根据通知类型应用不同的样式。接受通知列表作为属性：
+/* 创建一个居民通知组件，显示所有居民通知的列表，并根据通知类型应用不同的样式。接受通知列表作为属性： */
 function ResidentNotifications({ notifications }) {
   return (
     <div className={cn("resident-notifications", notifications.length > 0 && "has-notifications")} aria-live="polite">
@@ -1326,7 +1326,7 @@ function ResidentNotifications({ notifications }) {
   );
 }
 
-// 创建一个通知中心组件，管理通知队列和当前显示的通知，并根据设备类型（移动设备或非移动设备）渲染通知表面和居民通知。接受通知列表作为属性：
+/* 创建一个通知中心组件，管理通知队列和当前显示的通知，并根据设备类型（移动设备或非移动设备）渲染通知表面和居民通知。接受通知列表作为属性： */
 function NotificationCenter({ notifications }) {
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 720px)").matches);
   const [queue, setQueue] = useState([]);
@@ -1355,7 +1355,7 @@ function NotificationCenter({ notifications }) {
     if (current || !queue.length) return;
     setCurrent(queue[0]);
   }, [current, queue]);
-  // 定义一个函数，用于持久化地关闭当前通知。首先检查是否存在当前通知，如果不存在则直接返回。然后调用 `dismissNotificationPersistently` 函数将当前通知的键添加到已关闭通知的集合中。如果当前通知设置了 `notifyTwice` 属性，则将其添加到居民通知列表中，并按 `notifyNo` 属性进行排序。最后，从队列中移除当前通知，并将 `current` 状态设置为 `null`：
+  /* 定义一个函数，用于持久化地关闭当前通知。首先检查是否存在当前通知，如果不存在则直接返回。然后调用 `dismissNotificationPersistently` 函数将当前通知的键添加到已关闭通知的集合中。如果当前通知设置了 `notifyTwice` 属性，则将其添加到居民通知列表中，并按 `notifyNo` 属性进行排序。最后，从队列中移除当前通知，并将 `current` 状态设置为 `null`： */
   function dismissCurrent() {
     if (!current) return;
 
@@ -1379,7 +1379,7 @@ function NotificationCenter({ notifications }) {
   );
 }
 
-// 创建一个教室详情对话框组件，显示教室的详细信息、当前状态、本周概览和下一次课程。接受教室对象、数据、选定的周次、星期几、节次、关闭回调函数、收藏状态、收藏切换回调函数和导航回调函数作为属性：
+/* 创建一个教室详情对话框组件，显示教室的详细信息、当前状态、本周概览和下一次课程。接受教室对象、数据、选定的周次、星期几、节次、关闭回调函数、收藏状态、收藏切换回调函数和导航回调函数作为属性： */
 function RoomDialog({
   room,
   data,
@@ -1392,7 +1392,7 @@ function RoomDialog({
   onNavigate,
 }) {
   if (!room) return null;
-  // 获取教室在当前选定的周次、星期几和节次的占用情况，并根据选定的节次获取对应的时间段信息。然后根据选定的星期几获取对应的星期信息，并将选定的节次标签拼接成字符串。接着获取教室在当前周次的每一天的空闲情况概览，以及教室在当前周次、星期几和节次之后的下一次课程信息：
+  /* 获取教室在当前选定的周次、星期几和节次的占用情况，并根据选定的节次获取对应的时间段信息。然后根据选定的星期几获取对应的星期信息，并将选定的节次标签拼接成字符串。接着获取教室在当前周次的每一天的空闲情况概览，以及教室在当前周次、星期几和节次之后的下一次课程信息： */
   const occupied = getRoomEntriesForPeriods(room, selectedWeekday, selectedPeriods, selectedWeek);
   const selectedSlots = data.timeSlots.filter((slot) => selectedPeriods.includes(slot.code));
   const selectedDay = data.weekdays.find((day) => day.index === Number(selectedWeekday));
@@ -1403,7 +1403,6 @@ function RoomDialog({
   return (
     
     <Modal open={Boolean(room)} onOpenChange={onClose} className="dialog dialog-room">
-      // 教室详情对话框的头部，显示教室名称、建筑物、楼层、区域以及收藏按钮和关闭按钮。根据教室的收藏状态应用不同的样式类名，并在点击收藏按钮时调用 `onToggleFavorite` 回调函数切换收藏状态：
       <div className="dialog-header">
         <div>
           <div className="eyebrow">教室详情</div>
@@ -1429,7 +1428,6 @@ function RoomDialog({
         </div>
       </div>
 
-      // 教室详情对话框的摘要部分，显示当前周次、当前定位和当前状态。根据教室的占用情况显示“占用”或“空闲”状态：
       <div className="dialog-summary">
         <div>
           <span>当前周次</span>
@@ -1447,7 +1445,6 @@ function RoomDialog({
         </div>
       </div>
 
-      // 教室详情对话框的横幅部分，显示当前筛选时段的占用情况。如果教室在当前筛选时段有占用课程，则显示课程名称和教师信息；否则显示“当前筛选时段空闲”以及选定的节次标签：
       <div className="dialog-banner">
         <Check size={16} />
         <span>
@@ -1458,7 +1455,6 @@ function RoomDialog({
       </div>
 
       <div className="dialog-detail-grid">
-        // 教室详情对话框的本周概览部分，显示每一天的空闲情况。根据每一天的空闲课程数和总课程数计算空闲进度，并使用 CSS 变量设置进度条的宽度：
         <section className="dialog-detail-card">
           <div className="dialog-detail-heading">
             <div>
@@ -1482,7 +1478,6 @@ function RoomDialog({
           </div>
         </section>
 
-        // 教室详情对话框的下一次课程部分，显示教室在当前周次、星期几和节次之后的下一次课程信息。如果存在下一次课程，则显示课程名称、星期几、节次、时间段、教师和班级信息；否则显示“暂无后续安排”或“当前学期没有检测到后续课程”：
         <section className="dialog-detail-card next-course-card">
           <div className="dialog-detail-heading">
             <div>
@@ -1509,7 +1504,6 @@ function RoomDialog({
         </section>
       </div>
 
-      // 教室详情对话框的课表部分，显示教室在当前周次的课程安排。首先渲染课表的表头，包括节次和星期几。然后根据每个时间段和每个星期几获取教室的占用情况，并渲染相应的课程信息或“空闲”状态。如果有多个课程安排，则使用 `ExpandableScheduleEntries` 组件显示可展开的课程列表：
       <div className="schedule">
         <div className="schedule-head">
           <div className="schedule-corner">节次</div>
@@ -1566,7 +1560,7 @@ function RoomDialog({
   );
 }
 
-// 创建一个可展开的课程安排条目组件，显示课程安排的列表，并在超过指定数量时提供展开和收起的按钮。接受课程条目列表、折叠数量和渲染函数作为属性：
+/* 创建一个可展开的课程安排条目组件，显示课程安排的列表，并在超过指定数量时提供展开和收起的按钮。接受课程条目列表、折叠数量和渲染函数作为属性： */
 function ExpandableScheduleEntries({ entries, collapsedCount = 2, renderEntry }) {
   const [expanded, setExpanded] = useState(false);
   const visibleEntries = expanded ? entries : entries.slice(0, collapsedCount);
@@ -1590,7 +1584,7 @@ function ExpandableScheduleEntries({ entries, collapsedCount = 2, renderEntry })
   );
 }
 
-// 创建一个函数，根据当前视图类型（课程、教师或班级）从课表数据中获取相应的条目列表。如果视图类型为课程，则返回课程条目列表；如果视图类型为教师，则返回教师条目列表；如果视图类型为班级，则返回班级条目列表；否则返回空数组：
+/* 创建一个函数，根据当前视图类型（课程、教师或班级）从课表数据中获取相应的条目列表。如果视图类型为课程，则返回课程条目列表；如果视图类型为教师，则返回教师条目列表；如果视图类型为班级，则返回班级条目列表；否则返回空数组： */
 function getScheduleSourceEntries(scheduleData, view) {
   if (view === "courses") return scheduleData?.courseEntries ?? [];
   if (view === "teachers") return scheduleData?.teacherEntries ?? [];
@@ -1598,7 +1592,7 @@ function getScheduleSourceEntries(scheduleData, view) {
   return [];
 }
 
-// 创建一个函数，根据当前视图类型（课程、教师或班级）从条目中获取相应的实体值。如果视图类型为课程，则返回课程名称；如果视图类型为教师，则返回教师名称；如果视图类型为班级，则返回班级组名称；否则返回空字符串：
+/* 创建一个函数，根据当前视图类型（课程、教师或班级）从条目中获取相应的实体值。如果视图类型为课程，则返回课程名称；如果视图类型为教师，则返回教师名称；如果视图类型为班级，则返回班级组名称；否则返回空字符串： */
 function getScheduleEntityValue(entry, view) {
   if (view === "courses") return entry.courseName;
   if (view === "teachers") return entry.teacher;
@@ -1606,7 +1600,7 @@ function getScheduleEntityValue(entry, view) {
   return "";
 }
 
-// 创建一个函数，根据当前视图类型（课程、教师或班级）返回相应的对话框标题。如果视图类型为课程，则返回“课程课表”；如果视图类型为教师，则返回“教师课表”；如果视图类型为班级，则返回“班级课表”；否则返回“课表详情”：
+/* 创建一个函数，根据当前视图类型（课程、教师或班级）返回相应的对话框标题。如果视图类型为课程，则返回“课程课表”；如果视图类型为教师，则返回“教师课表”；如果视图类型为班级，则返回“班级课表”；否则返回“课表详情”： */
 function getEntityDialogTitle(view) {
   return {
     courses: "课程课表",
@@ -1615,7 +1609,7 @@ function getEntityDialogTitle(view) {
   }[view] || "课表详情";
 }
 
-// 创建一个函数，根据当前时间和课表数据获取实体的当前状态和下一次课程信息。如果没有条目或数据，或者选定的周次与当前周次不匹配，则返回 null。否则，计算当前时间所在的节次索引、当前定位和下一次课程，并返回包含当前条目、下一次课程和是否为当前周的对象：
+/* 创建一个函数，根据当前时间和课表数据获取实体的当前状态和下一次课程信息。如果没有条目或数据，或者选定的周次与当前周次不匹配，则返回 null。否则，计算当前时间所在的节次索引、当前定位和下一次课程，并返回包含当前条目、下一次课程和是否为当前周的对象： */
 function getEntityScheduleStatus(entries, data, selectedWeek, currentNow, currentTemporal) {
   if (!entries.length || !data || selectedWeek !== currentTemporal?.week) return null;
   const parts = getShanghaiParts(currentNow);
@@ -1655,7 +1649,7 @@ function getEntityScheduleStatus(entries, data, selectedWeek, currentNow, curren
   };
 }
 
-// 创建一个课程安排单元格组件，显示课程的名称、教师或班级、教室等信息，并提供导航和打开教室的操作。根据当前视图类型（课程或教师）显示相应的信息。接受课程条目、视图类型、教室对象、导航回调函数和打开教室回调函数作为属性：
+/* 创建一个课程安排单元格组件，显示课程的名称、教师或班级、教室等信息，并提供导航和打开教室的操作。根据当前视图类型（课程或教师）显示相应的信息。接受课程条目、视图类型、教室对象、导航回调函数和打开教室回调函数作为属性： */
 function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom }) {
   const primary = view === "courses" ? entry.classGroup : entry.courseName;
   const secondary = view === "teachers" ? entry.classGroup : entry.teacher;
@@ -1691,7 +1685,7 @@ function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom }) {
   );
 }
 
-// 创建一个实体课表对话框组件，显示实体（课程、教师或班级）的课表信息，包括本周安排、关联信息、涉及教室、当前定位和当前状态等。接受实体对象、课表数据、数据、选定的周次、星期几、节次、当前时间、当前学期、最大周次、教室映射对象以及关闭回调函数、周次变化回调函数、筛选变化回调函数、导航回调函数和打开教室回调函数作为属性：
+/* 创建一个实体课表对话框组件，显示实体（课程、教师或班级）的课表信息，包括本周安排、关联信息、涉及教室、当前定位和当前状态等。接受实体对象、课表数据、数据、选定的周次、星期几、节次、当前时间、当前学期、最大周次、教室映射对象以及关闭回调函数、周次变化回调函数、筛选变化回调函数、导航回调函数和打开教室回调函数作为属性： */
 function EntityScheduleDialog({
   entity,
   scheduleData,
@@ -1709,7 +1703,7 @@ function EntityScheduleDialog({
   onNavigate,
   onOpenRoom,
 }) {
-  // 如果实体对象、课表数据或数据不存在，则返回 null，不渲染任何内容：
+  /* 如果实体对象、课表数据或数据不存在，则返回 null，不渲染任何内容： */
   if (!entity || !scheduleData || !data) return null;
 
   const sourceEntries = getScheduleSourceEntries(scheduleData, entity.view);
@@ -1893,7 +1887,7 @@ function EntityScheduleDialog({
   );
 }
 
-// 创建一个命令对话框组件，提供搜索教室和课程的功能，并显示匹配结果。接受打开状态、打开状态变化回调函数、数据、命令查询、命令查询变化回调函数、选择教室回调函数、可用教室列表和课程结果作为属性：
+/* 创建一个命令对话框组件，提供搜索教室和课程的功能，并显示匹配结果。接受打开状态、打开状态变化回调函数、数据、命令查询、命令查询变化回调函数、选择教室回调函数、可用教室列表和课程结果作为属性： */
 function CommandDialog({
   open,
   onOpenChange,
@@ -2048,7 +2042,7 @@ function CommandDialog({
   );
 }
 
-// 创建一个加载屏幕组件，显示加载进度和当前阶段信息。接受加载进度和当前阶段作为属性：
+/* 创建一个加载屏幕组件，显示加载进度和当前阶段信息。接受加载进度和当前阶段作为属性： */
 function LoadingScreen({ progress, stage, notice }) {
   return (
     <main className="load-state">
@@ -2091,9 +2085,9 @@ function LoadingScreen({ progress, stage, notice }) {
   );
 }
 
-//这个是应用程序的主组件.
+/*这个是应用程序的主组件. */
 function App() {
-  //这一系列的状态变量用于管理应用程序的各种状态，包括数据、设置、加载进度、视图类型、筛选条件、命令面板等。它们使用 React 的 useState 钩子来创建和更新状态：
+  /*这一系列的状态变量用于管理应用程序的各种状态，包括数据、设置、加载进度、视图类型、筛选条件、命令面板等。它们使用 React 的 useState 钩子来创建和更新状态： */
   const isMac = typeof window !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
   const [data, setData] = useState(null);
   const [scheduleData, setScheduleData] = useState(null);
@@ -2135,7 +2129,7 @@ function App() {
   const autoInitialized = useRef(false);
   const [currentNow, setCurrentNow] = useState(() => new Date());
 
-// 使用 useEffect 钩子在组件挂载时加载数据文件、课程索引和设置文件，并更新加载进度和阶段信息。如果加载过程中发生错误，则设置错误状态。使用取消标志来防止在组件卸载后更新状态：
+/* 使用 useEffect 钩子在组件挂载时加载数据文件、课程索引和设置文件，并更新加载进度和阶段信息。如果加载过程中发生错误，则设置错误状态。使用取消标志来防止在组件卸载后更新状态： */
   useEffect(() => {
     let cancelled = false;
 
@@ -2260,7 +2254,7 @@ function App() {
   const queryPanelRef = useRef(null);
   const resultsSectionRef = useRef(null);
 
-  // 使用 useEffect 钩子在组件挂载时添加滚动事件监听器，计算滚动进度并更新状态变量 scrollProgress 和 showResultsJump。当组件卸载时，移除滚动事件监听器：
+  /* 使用 useEffect 钩子在组件挂载时添加滚动事件监听器，计算滚动进度并更新状态变量 scrollProgress 和 showResultsJump。当组件卸载时，移除滚动事件监听器： */
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentNow(new Date()), 1000);
     return () => window.clearInterval(timer);
@@ -2293,7 +2287,7 @@ function App() {
   const buildings = useMemo(() => getUniqueSorted(data?.rooms.map((room) => room.building) ?? []), [data]);
   const zones = useMemo(() => getUniqueSorted(data?.rooms.map((room) => room.zone) ?? []), [data]);
 
-  // 使用 useEffect 钩子在组件挂载时检查 URL 查询参数，并根据参数设置应用程序的状态。如果 URL 中包含共享状态，则使用共享状态更新视图、周次、星期几、节次、筛选条件等。如果 URL 中没有共享状态，则使用默认设置和自动计算的时间状态。设置 autoInitialized 和 urlInitialized 标志，以防止重复初始化：
+  /* 使用 useEffect 钩子在组件挂载时检查 URL 查询参数，并根据参数设置应用程序的状态。如果 URL 中包含共享状态，则使用共享状态更新视图、周次、星期几、节次、筛选条件等。如果 URL 中没有共享状态，则使用默认设置和自动计算的时间状态。设置 autoInitialized 和 urlInitialized 标志，以防止重复初始化： */
   useEffect(() => {
     if (!data || !settingsLoaded || urlInitialized) return;
 
@@ -2350,7 +2344,7 @@ function App() {
     return getUniqueSorted(scope.map((room) => room.floor));
   }, [data, selectedBuildings]);
 
-  // 使用 useEffect 钩子在 selectedFloors 或 floors 发生变化时，检查 selectedFloors 中的楼层是否仍然有效。如果 selectedFloors 中的某些楼层不再存在于 floors 中，则将其从 selectedFloors 中移除：
+  /* 使用 useEffect 钩子在 selectedFloors 或 floors 发生变化时，检查 selectedFloors 中的楼层是否仍然有效。如果 selectedFloors 中的某些楼层不再存在于 floors 中，则将其从 selectedFloors 中移除： */
   useEffect(() => {
     const nextFloors = selectedFloors.filter((floor) => floors.includes(floor));
     if (nextFloors.length !== selectedFloors.length) {
@@ -2372,7 +2366,7 @@ function App() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [settings.enableCommandPalette]);
 
-  // 使用 useEffect 钩子在组件挂载时添加滚动和调整大小事件监听器，以便在用户滚动页面或调整窗口大小时更新滚动进度和“跳转到结果”按钮的显示状态。当组件卸载时，移除事件监听器：
+  /* 使用 useEffect 钩子在组件挂载时添加滚动和调整大小事件监听器，以便在用户滚动页面或调整窗口大小时更新滚动进度和“跳转到结果”按钮的显示状态。当组件卸载时，移除事件监听器： */
   useEffect(() => {
     const updateScrollProgress = () => {
       const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
@@ -2502,7 +2496,7 @@ function App() {
   );
   const querySnapshot = useMemo(
     () =>
-      // 创建一个查询快照对象，包含当前的视图、时间模式、选中的周次、星期几、日期、节次、节次选择模式、是否仅显示可用教室、选中的楼栋、楼层、区域和查询字符串，以及选中的实体标签：
+      /* 创建一个查询快照对象，包含当前的视图、时间模式、选中的周次、星期几、日期、节次、节次选择模式、是否仅显示可用教室、选中的楼栋、楼层、区域和查询字符串，以及选中的实体标签： */
       createQuerySnapshot({
         activeView,
         temporalMode,
@@ -2563,14 +2557,14 @@ function App() {
 
     return () => window.clearTimeout(timer);
   }, [activeView, querySnapshot, urlInitialized]);
-  //定义了几个函数来处理筛选器的重置、使用今天的日期、处理日期变化、处理节次模式变化、切换收藏教室、应用最近查询、保存最近查询、打开教室、切换视图、导航到实体、打开实体卡片和从实体打开教室等操作：
+  /*定义了几个函数来处理筛选器的重置、使用今天的日期、处理日期变化、处理节次模式变化、切换收藏教室、应用最近查询、保存最近查询、打开教室、切换视图、导航到实体、打开实体卡片和从实体打开教室等操作： */
   function resetFilters() {
     setQuery("");
     setSelectedBuildings([]);
     setSelectedFloors([]);
     setSelectedZones([]);
   }
-  //用于重置所有筛选器和状态，包括视图、时间模式、周次、星期几、节次、节次选择模式、是否仅显示可用教室、选中的实体和教室等。根据设置中的默认值和自动计算的时间状态来恢复初始状态：
+  /*用于重置所有筛选器和状态，包括视图、时间模式、周次、星期几、节次、节次选择模式、是否仅显示可用教室、选中的实体和教室等。根据设置中的默认值和自动计算的时间状态来恢复初始状态： */
   function resetAllFilters() {
     const defaultMode = settings.defaultPeriodMode === "multiple" ? "multiple" : "single";
     const defaultTemporal = autoTemporal ?? {
@@ -2590,7 +2584,7 @@ function App() {
     setSelectedRoom(null);
     resetFilters();
   }
-  //使用此函数可以将应用程序的状态设置为当前日期和时间对应的周次、星期几和节次。它会调用 getAutoTemporalState 函数来获取当前时间的自动计算状态，并更新相关的状态变量：
+  /*使用此函数可以将应用程序的状态设置为当前日期和时间对应的周次、星期几和节次。它会调用 getAutoTemporalState 函数来获取当前时间的自动计算状态，并更新相关的状态变量： */
   function useToday() {
     if (!data) return;
     const today = getAutoTemporalState(data, settings);
@@ -2602,7 +2596,7 @@ function App() {
     setSelectedEntity(null);
     setSelectedRoom(null);
   }
-  //处理日期变化的函数
+  /*处理日期变化的函数 */
   function handleDateChange(value) {
     const temporal = getTemporalFromDate(value, settings.semesterStartDate, data.summary.maxWeek);
     if (!temporal) return;
@@ -2610,14 +2604,14 @@ function App() {
     setSelectedWeekday(temporal.weekday);
     setTemporalMode("date");
   }
-  //处理节次模式变化的函数
+  /*处理节次模式变化的函数 */
   function handlePeriodModeChange(mode) {
     setPeriodSelectionMode(mode);
     if (mode === "single" && selectedPeriods.length > 1) {
       setSelectedPeriods([selectedPeriods[0]]);
     }
   }
-  //切换收藏教室的函数
+  /*切换收藏教室的函数 */
   function toggleFavorite(roomName) {
     setFavorites((current) =>
       current.includes(roomName)
@@ -2625,7 +2619,7 @@ function App() {
         : [...current, roomName],
     );
   }
-  //应用最近查询的函数
+  /*应用最近查询的函数 */
   function applyRecentQuery(snapshot) {
     if (!snapshot) return;
     setActiveView(normalizeView(snapshot.activeView));
@@ -2649,7 +2643,7 @@ function App() {
     }
   }
 
-  //保存最近查询的函数
+  /*保存最近查询的函数 */
   function saveRecentQuery(snapshot = querySnapshot) {
     setRecentQueries((current) => {
       const serialized = JSON.stringify(snapshot);
@@ -2658,20 +2652,20 @@ function App() {
       return next;
     });
   }
-  // 打开教室的函数
+  /* 打开教室的函数 */
   function openRoom(room) {
     setSelectedRoom(room);
     setSelectedEntity(null);
     setCommandOpen(false);
   }
-  // 切换视图的函数
+  /* 切换视图的函数 */
   function changeView(view) {
     setActiveView(normalizeView(view));
     setQuery("");
     setSelectedRoom(null);
     setSelectedEntity(null);
   }
-  // 导航到实体的函数
+  /* 导航到实体的函数 */
   function navigateToEntity(view, label) {
     if (!label) return;
     const nextView = normalizeView(view);
@@ -2681,7 +2675,7 @@ function App() {
     setSelectedEntity({ view: nextView, label });
     setCommandOpen(false);
   }
-  // 打开实体卡片的函数
+  /* 打开实体卡片的函数 */
   function openEntityCard(view, label) {
     if (!label) return;
     const nextView = normalizeView(view);
@@ -2693,12 +2687,12 @@ function App() {
     });
     navigateToEntity(nextView, label);
   }
-  // 从实体打开教室的函数
+  /* 从实体打开教室的函数 */
   function openRoomFromEntity(room) {
     setSelectedEntity(null);
     openRoom(room);
   }
-  //如果加载数据时发生错误，则显示一个加载失败的界面，提示用户数据加载失败，并提供重新加载按钮和联系开发者的链接：
+  /*如果加载数据时发生错误，则显示一个加载失败的界面，提示用户数据加载失败，并提供重新加载按钮和联系开发者的链接： */
   if (loadError) {
     return (
       <main className="load-state">
@@ -2714,11 +2708,11 @@ function App() {
       </main>
     );
   }
-  //如果数据尚未加载完成或设置尚未加载完成，则显示一个加载屏幕组件，显示当前的加载进度和阶段信息：
+  /*如果数据尚未加载完成或设置尚未加载完成，则显示一个加载屏幕组件，显示当前的加载进度和阶段信息： */
   if (!data || !settingsLoaded) {
     return <LoadingScreen progress={loadProgress} stage={loadStage} notice={loadNotice} />;
   }
-  //如果数据和设置都已加载完成，则渲染应用程序的主界面，包括顶部栏、主内容区域、通知中心、筛选栏等。根据当前的状态变量，显示不同的视图和组件：
+  /*如果数据和设置都已加载完成，则渲染应用程序的主界面，包括顶部栏、主内容区域、通知中心、筛选栏等。根据当前的状态变量，显示不同的视图和组件： */
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -3246,7 +3240,7 @@ function App() {
   );
 }
 
-//定义了一个 ShieldIcon 组件，用于在结果遮罩中显示一个闪烁的图标：
+/*定义了一个 ShieldIcon 组件，用于在结果遮罩中显示一个闪烁的图标： */
 function ShieldIcon() {
   return (
     <div className="results-mask-icon">
@@ -3255,7 +3249,7 @@ function ShieldIcon() {
   );
 }
 
-//定义了一个 AppErrorBoundary 组件，用于捕获应用程序中的错误，并显示一个错误界面：
+/*定义了一个 AppErrorBoundary 组件，用于捕获应用程序中的错误，并显示一个错误界面： */
 export class AppErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -3283,5 +3277,5 @@ export class AppErrorBoundary extends Component {
   }
 }
 
-//定义了一个 App 组件，它是应用程序的根组件，负责加载数据和设置，并渲染 AppContent 组件：
+/*定义了一个 App 组件，它是应用程序的根组件，负责加载数据和设置，并渲染 AppContent 组件： */
 export default App;

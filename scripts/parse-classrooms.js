@@ -32,15 +32,15 @@ if (cliArg === "--help" || cliArg === "-h") {
   process.exit(0);
 }
 
-// With no argument, use the latest matching HTML file in the project root.
+/* With no argument, use the latest matching HTML file in the project root. */
 const SOURCE_FILE = cliArg
   ? path.resolve(process.cwd(), cliArg)
   : findLatestSourceFile();
 
-// When a page is saved via "View Source" in Chrome/Edge, the actual HTML is
-// encoded inside a <table class="line-wrap"> viewer. This unwraps it back to
-// the original HTML by extracting line-content cells, stripping span tags,
-// and decoding HTML entities.
+/* When a page is saved via "View Source" in Chrome/Edge, the actual HTML is */
+/* encoded inside a <table class="line-wrap"> viewer. This unwraps it back to */
+/* the original HTML by extracting line-content cells, stripping span tags, */
+/* and decoding HTML entities. */
 function unwrapSourceViewer(raw) {
   if (!raw.includes('class="line-wrap"')) {
     return raw;
@@ -52,9 +52,9 @@ function unwrapSourceViewer(raw) {
     lines.push(m[1]);
   }
   const joined = lines.join("\n");
-  // Strip all span tags used for syntax highlighting
+  /* Strip all span tags used for syntax highlighting */
   const stripped = joined.replace(/<span[^>]*>|<\/span>/g, "");
-  // Decode HTML entities (&lt; &gt; &amp; &quot; &#nn; &#xnn;)
+  /* Decode HTML entities (&lt; &gt; &amp; &quot; &#nn; &#xnn;) */
   return stripped
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
