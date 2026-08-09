@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to Pages
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: github-pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -39,7 +39,7 @@ jobs:
       - name: Parse schedule data
         run: npm run parse-schedule
 
-      - name: Build
+      - name: Build site
         run: npm run build
 
       - name: Upload Pages artifact
@@ -49,6 +49,7 @@ jobs:
 
   deploy:
     needs: build
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages

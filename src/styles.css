@@ -1,5 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap");
-
+/* 该CSS文件定义了应用程序的全局样式，包括字体、颜色、布局和组件样式。它使用了CSS变量来定义颜色和阴影等属性，以便在整个应用程序中保持一致的样式。文件中还包含了一些响应式设计的规则，以适应不同屏幕尺寸的显示效果。 */
 :root {
   font-family: "DM Sans", "Noto Sans SC", sans-serif;
   color: #1e293b;
