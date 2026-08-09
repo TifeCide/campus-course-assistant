@@ -40,9 +40,16 @@ import {
   Github,
 } from "lucide-react";
 
-const DATA_URL = `${import.meta.env.BASE_URL}data/classroom-data.json`;
-const SCHEDULE_URL = `${import.meta.env.BASE_URL}data/schedule-index.json`;
-const SETTINGS_URL = `${import.meta.env.BASE_URL}data/setting.json`;
+const GITHUB_USER = 'TifeCide';
+const GITHUB_REPO = 'campus-course-assistant';
+
+const CDN_BASE = import.meta.env.PROD
+  ? `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}@main/public/`
+  : import.meta.env.BASE_URL;
+
+const DATA_URL = `${CDN_BASE}data/classroom-data.json`;
+const SCHEDULE_URL = `${CDN_BASE}data/schedule-index.json`;
+const SETTINGS_URL =`${import.meta.env.BASE_URL}data/setting.json`;
 const FAVORITES_STORAGE_KEY = "classroom-favorites";
 const RECENT_QUERIES_STORAGE_KEY = "classroom-recent-queries";
 const DISMISSED_NOTIFICATIONS_STORAGE_KEY = "classroom-dismissed-notifications";
