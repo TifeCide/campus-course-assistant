@@ -27,12 +27,10 @@ import {
   LayoutGrid,
   LoaderCircle,
   MapPin,
-  Moon,
   PanelTop,
   Search,
   SlidersHorizontal,
   Sparkles,
-  Sun,
   TriangleAlert,
   UserRound,
   ArrowUpToLine,
@@ -56,6 +54,7 @@ const RESOURCE_SOURCES = {
   GHP:
     `https://tifecide.github.io/${GITHUB_REPO}/`,
 };
+const RESOURCE_SOURCE_LABELS = ["Cloudflare Pages", "JsDelivr CDN", "GitHub Pages"];
 
 const DATA_URLS = [
   `${RESOURCE_SOURCES.CF}data/classroom-data.json`,
@@ -74,6 +73,19 @@ const SETTINGS_URLS = [
   `${RESOURCE_SOURCES.JSD}data/setting.json`,
   `${RESOURCE_SOURCES.GHP}data/setting.json`,
 ];
+
+// 按当前 public/data 文件大小估算整体加载进度，避免小设置文件占用虚假的进度比例。
+const LOAD_RESOURCE_SIZE_ESTIMATES = {
+  data: 6_843_889,
+  schedule: 5_797_967,
+  settings: 1_295,
+};
+const LOAD_TOTAL_SIZE = Object.values(LOAD_RESOURCE_SIZE_ESTIMATES).reduce((sum, size) => sum + size, 0);
+const LOAD_RESOURCE_OFFSETS = {
+  data: 0,
+  schedule: LOAD_RESOURCE_SIZE_ESTIMATES.data,
+  settings: LOAD_RESOURCE_SIZE_ESTIMATES.data + LOAD_RESOURCE_SIZE_ESTIMATES.schedule,
+};
 
 //浏览器LocalStorage的键名，用于存储用户的收藏教室、最近查询和已关闭的通知等信息：
 const FAVORITES_STORAGE_KEY = "classroom-favorites";
@@ -219,6 +231,13 @@ function formatDateTime(value) {
 // 将数值限制在指定的最小值和最大值之间，如果数值小于最小值则返回最小值，大于最大值则返回最大值，否则返回原始数值：
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getOverallLoadProgress(resourceKey, progress) {
+  const resourceSize = LOAD_RESOURCE_SIZE_ESTIMATES[resourceKey] ?? 0;
+  const resourceOffset = LOAD_RESOURCE_OFFSETS[resourceKey] ?? 0;
+  const normalizedProgress = clamp(Number(progress) || 0, 0, 1);
+  return clamp((resourceOffset + resourceSize * normalizedProgress) / LOAD_TOTAL_SIZE, 0, 1);
 }
 
 // 将数值格式化为两位数的字符串，如果数值小于 10，则在前面补零：
@@ -407,8 +426,37 @@ async function fetchJsonWithProgress(url, onProgress) {
   }
 
   text += decoder.decode();
+  const value = JSON.parse(text);
   onProgress?.(1);
-  return JSON.parse(text);
+  return value;
+}
+
+async function fetchJsonFromUrls(urls, { onProgress, onFallback } = {}) {
+  let lastError = null;
+  let highestProgress = 0;
+
+  for (let index = 0; index < urls.length; index += 1) {
+    const url = urls[index];
+    try {
+      return await fetchJsonWithProgress(url, (progress) => {
+        highestProgress = Math.max(highestProgress, progress);
+        onProgress?.(highestProgress);
+      });
+    } catch (error) {
+      lastError = error;
+      if (index < urls.length - 1) {
+        onFallback?.({
+          sourceIndex: index,
+          nextSourceIndex: index + 1,
+          url,
+          nextUrl: urls[index + 1],
+          error,
+        });
+      }
+    }
+  }
+
+  throw lastError ?? new Error("加载失败");
 }
 
 // 创建一个查询快照对象，包含当前的视图、时间模式、选定的周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个包含这些信息的对象：
@@ -2001,7 +2049,7 @@ function CommandDialog({
 }
 
 // 创建一个加载屏幕组件，显示加载进度和当前阶段信息。接受加载进度和当前阶段作为属性：
-function LoadingScreen({ progress, stage }) {
+function LoadingScreen({ progress, stage, notice }) {
   return (
     <main className="load-state">
       <div className="loading-card">
@@ -2022,6 +2070,11 @@ function LoadingScreen({ progress, stage }) {
           <strong>{Math.round(progress * 100)}%</strong>
         </div>
         <p className="loading-stage">{stage}</p>
+        {notice ? (
+          <p className="loading-notice" role="status">
+            {notice}
+          </p>
+        ) : null}
         <div className="loading-skeleton-grid">
           <span />
           <span />
@@ -2050,6 +2103,7 @@ function App() {
   const [settingsError, setSettingsError] = useState("");
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadStage, setLoadStage] = useState("正在准备数据...");
+  const [loadNotice, setLoadNotice] = useState("");
   const [activeView, setActiveView] = useState("available");
   const [temporalMode, setTemporalMode] = useState("week");
   const [selectedWeek, setSelectedWeek] = useState(DEFAULT_WEEK);
@@ -2063,7 +2117,6 @@ function App() {
   const [query, setQuery] = useState("");
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [selectedEntity, setSelectedEntity] = useState(null);
-  const [isDark, setIsDark] = useState(false);
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
@@ -2087,35 +2140,68 @@ function App() {
     let cancelled = false;
 
     async function loadResources() {
+      const sourceLabel = (index) => RESOURCE_SOURCE_LABELS[index] ?? `备用源 ${index + 1}`;
+
       try {
+        setLoadNotice("");
+        setLoadProgress(0);
         setLoadStage("正在加载数据文件...");
-        const dataValue = await fetchJsonWithProgress(DATA_URL, (progress) => {
-          if (!cancelled) {
-            setLoadProgress(progress * 0.86);
-            setLoadStage(`正在加载数据文件 ${Math.round(progress * 100)}%`);
-          }
+        const dataValue = await fetchJsonFromUrls(DATA_URLS, {
+          onProgress: (progress) => {
+            if (!cancelled) {
+              setLoadProgress(getOverallLoadProgress("data", progress));
+              setLoadStage(`正在加载数据文件 ${Math.round(progress * 100)}%`);
+            }
+          },
+          onFallback: ({ sourceIndex, nextSourceIndex }) => {
+            if (!cancelled) {
+              setLoadNotice(
+                `数据文件：${sourceLabel(sourceIndex)} 加载失败，正在自动重试 ${sourceLabel(nextSourceIndex)}。`,
+              );
+            }
+          },
         });
 
         if (cancelled) return;
         setData(dataValue);
+        setLoadNotice("");
         setLoadStage("正在加载课程索引...");
 
-        const scheduleValue = await fetchJsonWithProgress(SCHEDULE_URL, (progress) => {
-          if (!cancelled) {
-            setLoadProgress(0.86 + progress * 0.07);
-            setLoadStage(`正在加载课程索引 ${Math.round(progress * 100)}%`);
-          }
+        const scheduleValue = await fetchJsonFromUrls(SCHEDULE_URLS, {
+          onProgress: (progress) => {
+            if (!cancelled) {
+              setLoadProgress(getOverallLoadProgress("schedule", progress));
+              setLoadStage(`正在加载课程索引 ${Math.round(progress * 100)}%`);
+            }
+          },
+          onFallback: ({ sourceIndex, nextSourceIndex }) => {
+            if (!cancelled) {
+              setLoadNotice(
+                `课程索引：${sourceLabel(sourceIndex)} 加载失败，正在自动重试 ${sourceLabel(nextSourceIndex)}。`,
+              );
+            }
+          },
         });
 
         if (cancelled) return;
         setScheduleData(scheduleValue);
+        setLoadNotice("");
         setLoadStage("正在初始化...");
 
-        const settingsValue = await fetchJsonWithProgress(SETTINGS_URL, (progress) => {
-          if (!cancelled) {
-            setLoadProgress(0.93 + progress * 0.07);
-            setLoadStage(`正在初始化 ${Math.round(progress * 100)}%`);
-          }
+        const settingsValue = await fetchJsonFromUrls(SETTINGS_URLS, {
+          onProgress: (progress) => {
+            if (!cancelled) {
+              setLoadProgress(getOverallLoadProgress("settings", progress));
+              setLoadStage(`正在初始化 ${Math.round(progress * 100)}%`);
+            }
+          },
+          onFallback: ({ sourceIndex, nextSourceIndex }) => {
+            if (!cancelled) {
+              setLoadNotice(
+                `设置文件：${sourceLabel(sourceIndex)} 加载失败，正在自动重试 ${sourceLabel(nextSourceIndex)}。`,
+              );
+            }
+          },
         });
 
         const rawMaskMessage = settingsValue?.maskMessage ?? {};
@@ -2271,11 +2357,6 @@ function App() {
       setSelectedFloors(nextFloors);
     }
   }, [floors, selectedFloors]);
-
-  // 使用 useEffect 钩子在 isDark 状态发生变化时，切换 HTML 文档的类名，以便应用深色模式或浅色模式：
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", isDark);
-  }, [isDark]);
 
   useEffect(() => {
     if (!settings.enableCommandPalette) return undefined;
@@ -2635,7 +2716,7 @@ function App() {
   }
   //如果数据尚未加载完成或设置尚未加载完成，则显示一个加载屏幕组件，显示当前的加载进度和阶段信息：
   if (!data || !settingsLoaded) {
-    return <LoadingScreen progress={loadProgress} stage={loadStage} />;
+    return <LoadingScreen progress={loadProgress} stage={loadStage} notice={loadNotice} />;
   }
   //如果数据和设置都已加载完成，则渲染应用程序的主界面，包括顶部栏、主内容区域、通知中心、筛选栏等。根据当前的状态变量，显示不同的视图和组件：
   return (
@@ -2666,14 +2747,6 @@ function App() {
             title="通知中心"
           >
             <Bell size={18} />
-          </button>
-          <button
-            className="icon-button theme-toggle"
-            onClick={() => setIsDark((value) => !value)}
-            type="button"
-            aria-label="切换主题"
-          >
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
       </header>
@@ -3082,7 +3155,7 @@ function App() {
         </div>
 
         <div className="footer-row footer-powered">
-          <p>Powered by GitHub Pages 51LA</p>
+          <p>Powered by Cloudflare Pages 51LA</p>
         </div>
       </footer>
 

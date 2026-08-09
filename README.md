@@ -2,7 +2,9 @@
 
 一个基于 React 和 Vite 的纯前端课室查询系统，用于查询校园教室在指定周次、日期和节次下的空闲情况，也支持按课程、教师和班级检索课表。
 
-项目不需要后端服务或数据库，页面运行时直接读取 `public/data/` 中的 JSON 文件。生产环境可以部署到 GitHub Pages 或其他静态文件服务器。
+项目不需要后端服务或数据库，页面运行时读取静态 JSON 数据。生产环境可以部署到 GitHub Pages、Cloudflare Pages 或其他静态文件服务器。
+
+数据资源配置了多个来源：当前部署路径、jsDelivr CDN 和 GitHub Pages。单个来源加载失败时，页面会提示失败来源并自动切换到下一个来源。
 
 ## 功能
 
@@ -13,11 +15,11 @@
 - 支持课程、教师、班级和教室检索
 - 查看教室课程安排、每周概览和下一节课程
 - 收藏教室，并保存最近查询
-- 支持深色模式
 - 支持通知中心和配置化通知
 - 支持命令面板和 `Ctrl / Cmd + K` 快速搜索
 - 查询条件同步到 URL，便于分享和恢复
 - 支持结果区域遮罩
+- 支持数据文件多来源加载、失败提示和自动重试
 - 响应式布局，适配桌面端和移动端
 
 ## 技术栈
@@ -27,6 +29,7 @@
 - lucide-react
 - 原生 `fetch`、`localStorage` 和浏览器 URL API
 - GitHub Actions + GitHub Pages
+- Cloudflare Pages、jsDelivr CDN 和 GitHub Pages 多来源静态资源回退
 
 ## 环境要求
 
@@ -61,6 +64,12 @@ npm run dev
 npm run parse
 ```
 
+解析课程、教师和班级索引：
+
+```bash
+npm run parse-schedule
+```
+
 生产构建：
 
 ```bash
@@ -79,7 +88,7 @@ npm run preview
 npm run update-data
 ```
 
-推荐在更新课表或准备部署时使用 `npm run update-data`。
+`npm run update-data` 会依次执行 `npm run parse`、`npm run parse-schedule` 和 `npm run build`。推荐在更新课表或准备部署时使用。
 
 ## 项目结构
 
@@ -88,10 +97,12 @@ npm run update-data
 ├─ .github/workflows/deploy-pages.yml   GitHub Pages 部署流程
 ├─ public/
 │  └─ data/
-│     ├─ classroom-data.json            解析器生成的课室数据
+│     ├─ classroom-data.json            教室、时间段和占用数据
+│     ├─ schedule-index.json            课程、教师和班级索引
 │     └─ setting.json                   网站运行配置
 ├─ scripts/
-│  └─ parse-classrooms.js               HTML 课表解析器
+│  ├─ parse-classrooms.js               教室课表解析器
+│  └─ parse-schedule.js                 课程、教师和班级索引解析器
 ├─ src/
 │  ├─ App.jsx                           页面组件和主要业务逻辑
 │  ├─ main.jsx                          React 应用入口
@@ -104,13 +115,20 @@ npm run update-data
 └─ README.md                            项目说明
 ```
 
-根目录中的 `kbxx_classroom_ifr_*.html` 是课表原始文件。它们是解析器的输入，不是浏览器运行时直接读取的数据。
+根目录中的以下 HTML 文件是解析器的输入，不是浏览器运行时直接读取的数据：
+
+```text
+kbxx_classroom_ifr_*.html   教室课表
+kbxx_kc_ifr_*.html          课程课表
+kbxx_teacher_ifr_*.html     教师课表
+kbxx_xzb_ifr_*.html          行政班课表
+```
 
 ## 更新课表数据
 
 ### 1. 放置原始课表
 
-将新的课表 HTML 文件放到项目根目录，文件名保持以下格式：
+将新的教室课表 HTML 文件放到项目根目录，文件名保持以下格式：
 
 ```text
 kbxx_classroom_ifr_2026-2027-1.html
@@ -122,7 +140,7 @@ kbxx_classroom_ifr_2026-2027-1.html
 kbxx_classroom_ifr_*.html
 ```
 
-不带参数运行时，解析器会按文件名排序并自动选择最新文件：
+不带参数运行时，`parse-classrooms.js` 会按文件名排序并自动选择最新教室课表：
 
 ```bash
 npm run parse
@@ -155,7 +173,39 @@ public/data/classroom-data.json
 
 执行成功后会输出教室数量、课程记录数量和检测到的最大周次。
 
-### 3. 构建并检查
+### 3. 生成课程索引
+
+将课程、教师和行政班课表放在项目根目录：
+
+```text
+kbxx_kc_ifr_*.html
+kbxx_teacher_ifr_*.html
+kbxx_xzb_ifr_*.html
+```
+
+执行：
+
+```bash
+npm run parse-schedule
+```
+
+解析器会为三类文件分别选择文件名排序后最新的文件，合并生成：
+
+```text
+public/data/schedule-index.json
+```
+
+该文件供课程、教师和班级检索，以及实体周课表使用。
+
+### 4. 一次完成更新和构建
+
+```bash
+npm run update-data
+```
+
+执行后会同时更新 `classroom-data.json`、`schedule-index.json` 并生成生产构建。
+
+### 5. 构建并检查
 
 ```bash
 npm run update-data
@@ -168,8 +218,9 @@ npm run update-data
 - `summary.totalRooms` 是否合理
 - `summary.totalEntries` 是否合理
 - `summary.maxWeek` 是否合理
+- `public/data/schedule-index.json` 的 `generatedAt`、`sourceFiles` 和 `summary` 是否合理
 
-注意：GitHub Actions 的部署流程不会运行 `npm run parse`，只会构建已经提交到仓库的文件。因此更新课表后必须提交生成后的 `public/data/classroom-data.json`。
+注意：GitHub Actions 的部署流程会运行 `npm run parse-schedule`，但不会运行 `npm run parse`。因此更新教室课表后，必须在本地运行 `npm run parse` 并提交生成后的 `public/data/classroom-data.json`；课程、教师和班级索引会在部署时重新生成。
 
 ## 网站配置
 
@@ -205,7 +256,7 @@ public/data/setting.json
   "semesterStartDate": "2026-08-31",
   "semesterEndDate": "2026-12-20",
   "defaultView": "available",
-  "defaultOnlyAvailable": true,
+  "defaultOnlyAvailable": false,
   "defaultPeriodMode": "single",
   "searchResultLimit": 75,
   "enableCommandPalette": true,
@@ -306,15 +357,28 @@ dist/
 1. 推送到 `main` 分支，或手动触发工作流。
 2. 使用 Node.js 20。
 3. 执行 `npm ci`。
-4. 执行 `npm run build`。
-5. 发布 `dist/` 到 GitHub Pages。
+4. 设置 UTC 构建时间并注入页面。
+5. 执行 `npm run parse-schedule`。
+6. 执行 `npm run build`。
+7. 发布 `dist/` 到 GitHub Pages。
 
 部署前需要确认：
 
 - `public/data/classroom-data.json` 已经是最新版本。
 - `public/data/setting.json` 已经包含当前学期配置。
+- `public/data/schedule-index.json` 可以由部署流程重新生成；本地预览前建议先运行 `npm run parse-schedule`。
 - GitHub 仓库的 Pages 发布源配置为 GitHub Actions。
 - 如果使用自定义域名，`CNAME` 内容和域名 DNS 配置正确。
+
+### Vite 基础路径
+
+`vite.config.js` 默认使用相对基础路径 `./`，适合部署到静态文件服务器和 GitHub Pages。需要部署到指定子路径时，可以设置：
+
+```bash
+VITE_BASE_PATH=/your-path/ npm run build
+```
+
+项目运行时会根据构建后的基础路径读取当前部署路径下的 `data/` 资源。
 
 ## 修改代码时的入口
 
@@ -323,7 +387,8 @@ dist/
 | 区域 | 主要内容 |
 | --- | --- |
 | 日期和周次函数 | `getAcademicWeek`、`getAcademicPhase`、`getRoomDateValue`、`getTemporalFromDate` |
-| 数据加载 | `fetchJsonWithProgress` 及 `App` 内的资源加载逻辑 |
+| 数据加载 | `fetchJsonWithProgress`、`fetchJsonFromUrls` 及 `App` 内的资源加载逻辑 |
+| 加载进度 | `getOverallLoadProgress` 和 `LOAD_RESOURCE_SIZE_ESTIMATES` |
 | 空闲教室筛选 | `getRoomEntries`、`getRoomEntriesForPeriods`、`filteredRooms`、`availableRooms` |
 | 课程检索 | `courseResults` 及 `CommandDialog` |
 | 教室卡片和详情 | `RoomCard`、`RoomDialog` |
@@ -383,22 +448,28 @@ kbxx_classroom_ifr_*.html
 
 ```text
 data/classroom-data.json
+data/schedule-index.json
 data/setting.json
 ```
 
-同时检查浏览器开发者工具中的网络请求和 JSON 格式。
+页面会依次尝试当前部署路径、jsDelivr CDN 和 GitHub Pages。如果某个来源失败，加载页会显示失败来源并自动重试下一个来源。若三个来源都失败，再检查：
+
+1. 对应 JSON 文件是否已提交或已发布。
+2. GitHub 仓库名和用户配置是否正确。
+3. 静态服务器是否允许跨域读取 JSON。
+4. 浏览器开发者工具中的网络请求和 JSON 格式。
 
 ## 快速更新清单
 
 更新一个新学期的课表时：
 
 ```text
-1. 将新的 kbxx_classroom_ifr_*.html 放到项目根目录。
+1. 将新的 `kbxx_classroom_ifr_*.html`、`kbxx_kc_ifr_*.html`、`kbxx_teacher_ifr_*.html` 和 `kbxx_xzb_ifr_*.html` 放到项目根目录。
 2. 修改 public/data/setting.json 中的 semesterStartDate 和 semesterEndDate。
 3. 执行 npm run update-data。
-4. 检查解析输出和 public/data/classroom-data.json 的 summary。
+4. 检查两个 JSON 文件的解析输出、generatedAt、sourceFile/sourceFiles 和 summary。
 5. 执行 npm run build，确认构建通过。
-6. 提交源课表、生成后的 JSON、配置和代码变更。
+6. 提交源课表、生成后的 `classroom-data.json`、配置和代码变更。
 7. 推送到 main，等待 GitHub Pages 工作流完成。
 ```
 
