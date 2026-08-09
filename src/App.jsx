@@ -2780,7 +2780,7 @@ function App() {
             <div className="hero-meta" aria-label="更新时间">
               <div className="hero-meta-item">
                 <Clock3 size={15} />
-                <span>系统更新时间</span>
+                <span>助手更新时间</span>
                 <time dateTime={BUILD_TIME}>{formatDateTime(BUILD_TIME)}</time>
               </div>
               <div className="hero-meta-item">
