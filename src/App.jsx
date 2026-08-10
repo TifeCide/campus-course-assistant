@@ -101,10 +101,10 @@ const LOAD_RESOURCE_SIZE_ESTIMATES = {
   settings: 1_295,
 };
 const LOAD_TOTAL_SIZE = Object.values(LOAD_RESOURCE_SIZE_ESTIMATES).reduce((sum, size) => sum + size, 0);
-const LOAD_RESOURCE_OFFSETS = {
-  data: 0,
-  schedule: LOAD_RESOURCE_SIZE_ESTIMATES.data,
-  settings: LOAD_RESOURCE_SIZE_ESTIMATES.data + LOAD_RESOURCE_SIZE_ESTIMATES.schedule,
+const LOAD_RESOURCE_LABELS = {
+  data: "数据文件",
+  schedule: "课程索引",
+  settings: "设置",
 };
 
 /*浏览器LocalStorage的键名，用于存储用户的收藏教室、最近查询和已关闭的通知等信息： */
@@ -253,11 +253,13 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function getOverallLoadProgress(resourceKey, progress) {
-  const resourceSize = LOAD_RESOURCE_SIZE_ESTIMATES[resourceKey] ?? 0;
-  const resourceOffset = LOAD_RESOURCE_OFFSETS[resourceKey] ?? 0;
-  const normalizedProgress = clamp(Number(progress) || 0, 0, 1);
-  return clamp((resourceOffset + resourceSize * normalizedProgress) / LOAD_TOTAL_SIZE, 0, 1);
+function getOverallLoadProgress(resourceProgresses) {
+  const loadedSize = Object.entries(LOAD_RESOURCE_SIZE_ESTIMATES).reduce(
+    (total, [resourceKey, resourceSize]) =>
+      total + resourceSize * clamp(Number(resourceProgresses[resourceKey]) || 0, 0, 1),
+    0,
+  );
+  return clamp(loadedSize / LOAD_TOTAL_SIZE, 0, 1);
 }
 
 /* 将数值格式化为两位数的字符串，如果数值小于 10，则在前面补零： */
@@ -2155,68 +2157,57 @@ function App() {
 
     async function loadResources() {
       const sourceLabel = (index) => RESOURCE_SOURCE_LABELS[index] ?? `备用源 ${index + 1}`;
+      const resourceProgresses = {
+        data: 0,
+        schedule: 0,
+        settings: 0,
+      };
+      let failed = false;
+
+      const updateResourceProgress = (resourceKey, progress) => {
+        resourceProgresses[resourceKey] = clamp(Number(progress) || 0, 0, 1);
+        if (cancelled || failed) return;
+
+        setLoadProgress(getOverallLoadProgress(resourceProgresses));
+        const pendingStages = Object.entries(resourceProgresses)
+          .filter(([, resourceProgress]) => resourceProgress < 1)
+          .map(
+            ([key, resourceProgress]) =>
+              `${LOAD_RESOURCE_LABELS[key]} ${Math.round(resourceProgress * 100)}%`,
+          );
+        setLoadStage(
+          pendingStages.length ? `正在加载：${pendingStages.join("、")}` : "正在处理数据...",
+        );
+      };
+
+      const loadResource = (resourceKey, urls) =>
+        fetchJsonFromUrls(urls, {
+          onProgress: (progress) => updateResourceProgress(resourceKey, progress),
+          onFallback: ({ sourceIndex, nextSourceIndex }) => {
+            if (!cancelled && !failed) {
+              setLoadNotice(
+                `${LOAD_RESOURCE_LABELS[resourceKey]}：${sourceLabel(sourceIndex)} 加载失败，正在重试 ${sourceLabel(nextSourceIndex)}。`,
+              );
+            }
+          },
+        });
 
       try {
         setLoadNotice("");
         setLoadProgress(0);
-        setLoadStage("正在加载数据文件...");
-        const dataValue = await fetchJsonFromUrls(DATA_URLS, {
-          onProgress: (progress) => {
-            if (!cancelled) {
-              setLoadProgress(getOverallLoadProgress("data", progress));
-              setLoadStage(`正在加载数据文件 ${Math.round(progress * 100)}%`);
-            }
-          },
-          onFallback: ({ sourceIndex, nextSourceIndex }) => {
-            if (!cancelled) {
-              setLoadNotice(
-                `数据文件：${sourceLabel(sourceIndex)} 加载失败，正在自动重试 ${sourceLabel(nextSourceIndex)}。`,
-              );
-            }
-          },
-        });
+        setLoadStage("正在加载：数据文件 0%、课程索引 0%、设置 0%");
+
+        const [dataValue, scheduleValue, settingsValue] = await Promise.all([
+          loadResource("data", DATA_URLS),
+          loadResource("schedule", SCHEDULE_URLS),
+          loadResource("settings", SETTINGS_URLS),
+        ]);
 
         if (cancelled) return;
         setData(dataValue);
-        setLoadNotice("");
-        setLoadStage("正在加载课程索引...");
-
-        const scheduleValue = await fetchJsonFromUrls(SCHEDULE_URLS, {
-          onProgress: (progress) => {
-            if (!cancelled) {
-              setLoadProgress(getOverallLoadProgress("schedule", progress));
-              setLoadStage(`正在加载课程索引 ${Math.round(progress * 100)}%`);
-            }
-          },
-          onFallback: ({ sourceIndex, nextSourceIndex }) => {
-            if (!cancelled) {
-              setLoadNotice(
-                `课程索引：${sourceLabel(sourceIndex)} 加载失败，正在自动重试 ${sourceLabel(nextSourceIndex)}。`,
-              );
-            }
-          },
-        });
-
-        if (cancelled) return;
         setScheduleData(scheduleValue);
         setLoadNotice("");
         setLoadStage("正在初始化...");
-
-        const settingsValue = await fetchJsonFromUrls(SETTINGS_URLS, {
-          onProgress: (progress) => {
-            if (!cancelled) {
-              setLoadProgress(getOverallLoadProgress("settings", progress));
-              setLoadStage(`正在初始化 ${Math.round(progress * 100)}%`);
-            }
-          },
-          onFallback: ({ sourceIndex, nextSourceIndex }) => {
-            if (!cancelled) {
-              setLoadNotice(
-                `设置文件：${sourceLabel(sourceIndex)} 加载失败，正在自动重试 ${sourceLabel(nextSourceIndex)}。`,
-              );
-            }
-          },
-        });
 
         const rawMaskMessage = settingsValue?.maskMessage ?? {};
         const title =
@@ -2255,6 +2246,7 @@ function App() {
         setLoadProgress(1);
         setLoadStage("数据加载完成");
       } catch (error) {
+        failed = true;
         if (cancelled) return;
         setLoadError(error.message);
         setSettingsError(error.message);
@@ -2719,7 +2711,7 @@ function App() {
         <div className="load-card">
           <CircleHelp size={30} />
           <h1>数据加载失败</h1>
-          <p>{loadError}.<br />如多次出现此问题，请联系<a href="https://github.com/TifeCide" target="_blank" rel="noopener noreferrer">开发者</a>。
+          <p>{loadError}.<br />如多次出现此问题，请<a href={`https://github.com/${GITHUB_USER}`} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>联系开发者</a>。
           </p>
           <button className="button button-primary" onClick={() => window.location.reload()} type="button">
             重新加载
@@ -2729,7 +2721,7 @@ function App() {
     );
   }
   /*如果数据尚未加载完成或设置尚未加载完成，则显示一个加载屏幕组件，显示当前的加载进度和阶段信息： */
-  if (!data || !settingsLoaded) {
+  if (!data || !scheduleData || !settingsLoaded) {
     return <LoadingScreen progress={loadProgress} stage={loadStage} notice={loadNotice} />;
   }
   /*如果数据和设置都已加载完成，则渲染应用程序的主界面，包括顶部栏、主内容区域、通知中心、筛选栏等。根据当前的状态变量，显示不同的视图和组件： */
