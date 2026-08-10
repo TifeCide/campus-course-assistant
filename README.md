@@ -246,6 +246,17 @@ GitHub Actions 只构建已提交的数据，不再解析原始 HTML。因此更
 
 班级组合文本按逗号分段，段末的 `班` 仅作为分隔标记移除，例如 `工业设计26班,电信26B班` 生成 `工业设计26` 和 `电信26B`。`新闻26AB`、`新闻26CD` 等带字母后缀的班级保持原样；只有在 `scripts/class-normalization.json` 的 `splits` 中显式配置时才会拆分。
 
+各 v2 文件的职责与加载时机：
+
+| 文件 | 首屏是否读取 | 主要内容 |
+| --- | --- | --- |
+| `manifest.json` | 是 | v2 文件入口、版本摘要、各文件哈希与大小 |
+| `common.json` | 是 | 学期与时间段字典、课程/教师/班级名称字典 |
+| `rooms.json` | 是 | 教室基础信息（楼栋、楼层、区域等） |
+| `availability.json` | 是 | 按周/星期/节次组织的占用位图索引，用于空闲教室筛选 |
+| `directory.json` | 否（按需） | 课程/教师/班级目录索引，供搜索入口快速筛选 |
+| `schedule.json` | 否（按需） | 规范化课程事件明细，供教室详情和实体课表使用 |
+
 ## 网站配置
 
 配置文件：
@@ -351,6 +362,24 @@ localStorage.removeItem("classroom-favorites");
 localStorage.removeItem("classroom-recent-queries");
 localStorage.removeItem("classroom-dismissed-notifications");
 ```
+
+## URL 查询参数
+
+查询条件会同步到 URL，可直接复制链接共享当前筛选状态。当前支持的参数：
+
+| 参数 | 含义 | 示例 |
+| --- | --- | --- |
+| `view` | 视图：`available` / `courses` / `teachers` / `classes` | `view=available` |
+| `mode` | 时间模式：`week`（默认）或 `date` | `mode=date` |
+| `date` | 指定日期（`YYYY-MM-DD`） | `date=2026-09-07` |
+| `week` | 教学周（仅 `mode=week`） | `week=3` |
+| `weekday` | 星期（1-7，仅 `mode=week`） | `weekday=2` |
+| `periods` | 节次编码，多个值用逗号分隔 | `periods=0304,0506` |
+| `periodMode` | 节次模式：`single`（默认）/ `multiple` | `periodMode=multiple` |
+| `available` | 是否仅看空闲：`1`（默认）/ `0` | `available=0` |
+| `buildings` | 楼栋筛选，多个值用逗号分隔 | `buildings=厚德楼,博学楼` |
+| `floors` | 楼层筛选，多个值用逗号分隔 | `floors=2,3` |
+| `zones` | 区域筛选，多个值用逗号分隔 | `zones=普通教学区` |
 
 ## 构建和部署
 
