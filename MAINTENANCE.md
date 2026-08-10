@@ -15,7 +15,7 @@ public/data/setting.json
 
 不需要后端服务，也不需要鉴权。
 
-`public/data/v2/` 包含公共字典、教室、占用索引、规范化课程事件和目录索引，供前端后续分阶段迁移使用。
+`public/data/v2/` 包含公共字典、教室、占用索引、规范化课程事件和目录索引。前端首屏读取教室与占用索引，目录和完整课表按交互延迟加载。
 
 ## 2. 常用命令
 
@@ -150,8 +150,8 @@ npm run build
 | `src/App.jsx` | 页面组件、筛选逻辑、数据加载、收藏和最近查询 |
 | `src/styles.css` | 全部页面样式、响应式布局和深色模式 |
 | `src/main.jsx` | React 应用入口 |
-| `public/data/classroom-data.json` | 前端实际读取的课室数据 |
-| `public/data/v2/` | 模块化数据产物 |
+| `public/data/classroom-data.json` | 兼容解析产物和 v2 校验基准 |
+| `public/data/v2/` | 前端实际读取的模块化数据 |
 | `public/data/setting.json` | 网站行为配置 |
 | `scripts/parse-classrooms.js` | HTML 课表解析器 |
 | `scripts/build-data-v2.js` | v2 规范化数据构建器 |

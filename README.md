@@ -242,7 +242,7 @@ GitHub Actions 只构建已提交的数据，不再解析原始 HTML。因此更
 
 ### v2 模块化数据
 
-`public/data/v2/` 当前与旧数据并行生成，便于前端分阶段迁移。`availability.json` 只保存每周、星期和节次下的占用 `roomId`；`schedule.json` 使用数值 ID，不保存中文文本；课程、教师和班级搜索通过 `directory.json` 的倒排索引定位事件。
+前端已使用 `public/data/v2/`：首屏读取 `manifest.json`、`common.json`、`rooms.json` 和 `availability.json`；打开教室详情、实体课表或命令面板时才读取 `schedule.json`；普通课程、教师和班级搜索先使用 `directory.json` 的倒排索引。旧 JSON 仅保留为解析兼容产物。
 
 组合班名称会按后缀展开，例如 `财务管理25AB班` 会生成 `财务管理25A班` 和 `财务管理25B班` 两个实体，原始组合文本仍保存在公共字典中。无法自动处理的别名或拆分规则写入 `scripts/class-normalization.json`。
 
@@ -467,11 +467,13 @@ kbxx_classroom_ifr_*.html
 
 ### 页面加载失败
 
-确认以下文件能够通过部署后的静态路径访问：
+确认以下 v2 文件能够通过部署后的静态路径访问：
 
 ```text
-data/classroom-data.json
-data/schedule-index.json
+data/v2/manifest.json
+data/v2/common.json
+data/v2/rooms.json
+data/v2/availability.json
 data/setting.json
 ```
 

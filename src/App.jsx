@@ -1,4 +1,4 @@
-import React, { Component, useEffect, useMemo, useRef, useState } from "react";
+import React, { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 /*从 lucide-react 导入所需的图标组件 */
 import {
@@ -76,34 +76,36 @@ const RESOURCE_SOURCES = {
 };
 const RESOURCE_SOURCE_LABELS = ["Cloudflare Pages", "JsDelivr CDN", "GitHub Pages"];
 
-const DATA_URLS = [
-  `${RESOURCE_SOURCES.CF}data/classroom-data.json`,
-  `${RESOURCE_SOURCES.JSD}data/classroom-data.json`,
-  `${RESOURCE_SOURCES.GHP}data/classroom-data.json`,
-];
-
-const SCHEDULE_URLS = [
-  `${RESOURCE_SOURCES.CF}data/schedule-index.json`,
-  `${RESOURCE_SOURCES.JSD}data/schedule-index.json`,
-  `${RESOURCE_SOURCES.GHP}data/schedule-index.json`,
-];
-
 const SETTINGS_URLS = [
   `${RESOURCE_SOURCES.CF}data/setting.json`,
   `${RESOURCE_SOURCES.JSD}data/setting.json`,
   `${RESOURCE_SOURCES.GHP}data/setting.json`,
 ];
 
-/* 按当前 public/data 文件大小估算整体加载进度，避免小设置文件占用虚假的进度比例。 */
+function getV2ResourceUrls(filePath) {
+  return [
+    `${RESOURCE_SOURCES.CF}${filePath}`,
+    `${RESOURCE_SOURCES.JSD}${filePath}`,
+    `${RESOURCE_SOURCES.GHP}${filePath}`,
+  ];
+}
+
+const V2_MANIFEST_URLS = getV2ResourceUrls("data/v2/manifest.json");
+
+/* 按 v2 首屏资源大小估算整体加载进度。课程目录和完整课表会在需要时再加载。 */
 const LOAD_RESOURCE_SIZE_ESTIMATES = {
-  data: 6_843_889,
-  schedule: 5_797_967,
+  manifest: 1_000,
+  common: 50_000,
+  rooms: 23_000,
+  availability: 127_000,
   settings: 1_295,
 };
 const LOAD_TOTAL_SIZE = Object.values(LOAD_RESOURCE_SIZE_ESTIMATES).reduce((sum, size) => sum + size, 0);
 const LOAD_RESOURCE_LABELS = {
-  data: "数据文件",
-  schedule: "课程索引",
+  manifest: "数据版本",
+  common: "公共字典",
+  rooms: "教室信息",
+  availability: "占用索引",
   settings: "设置",
 };
 
@@ -117,6 +119,7 @@ const DEFAULT_WEEK = 1;
 const DEFAULT_WEEKDAY = 1;
 const DEFAULT_PERIOD = "0102";
 const EXAM_WEEK_COUNT = 3;
+const OCCUPIED_ENTRY = Object.freeze({ courseName: "课程安排", teacher: "", classGroup: "" });
 
 /*默认的应用设置，包括学期开始和结束日期、信息显示模式、默认视图、搜索结果限制等： */
 const DEFAULT_SETTINGS = {
@@ -414,7 +417,15 @@ function getAutoTemporalState(data, settings, date = new Date()) {
 
 /* 获取指定教室在特定周次、星期几和节次代码下的所有课程条目。如果教室或相关数据不存在，则返回一个空数组： */
 function getRoomEntries(room, weekday, periodCode, week) {
-  return room?.slots?.[String(weekday)]?.[periodCode]?.filter((entry) => entry.weeks.includes(Number(week))) ?? [];
+  const slotEntries = room?.slots?.[String(weekday)]?.[periodCode];
+  if (slotEntries) {
+    return slotEntries.filter((entry) => entry.weeks.includes(Number(week)));
+  }
+
+  const periodIndex = room?.periodIndexByCode?.[periodCode];
+  const slotIndex = (Number(weekday) - 1) * (room?.periodCount ?? 0) + periodIndex;
+  const weekMask = room?.occupancyMasks?.[slotIndex] ?? 0;
+  return weekMask & (1 << (Number(week) - 1)) ? [OCCUPIED_ENTRY] : [];
 }
 
 /* 获取指定教室在特定周次、星期几和多个节次代码下的所有课程条目。通过调用 getRoomEntries 函数并将结果展平为一个数组返回： */
@@ -479,6 +490,214 @@ async function fetchJsonFromUrls(urls, { onProgress, onFallback } = {}) {
   }
 
   throw lastError ?? new Error("加载失败");
+}
+
+function getWeeksFromMask(weekMask, maxWeek) {
+  const weeks = [];
+  for (let week = 1; week <= maxWeek; week += 1) {
+    if (weekMask & (1 << (week - 1))) weeks.push(week);
+  }
+  return weeks;
+}
+
+function getWeekPresentation(weekMask, maxWeek, cache) {
+  if (cache.has(weekMask)) return cache.get(weekMask);
+
+  const weeks = getWeeksFromMask(weekMask, maxWeek);
+  const ranges = [];
+  for (let index = 0; index < weeks.length;) {
+    const start = weeks[index];
+    let end = start;
+    while (weeks[index + 1] === end + 1) {
+      index += 1;
+      end = weeks[index];
+    }
+    ranges.push(start === end ? String(start) : `${start}-${end}`);
+    index += 1;
+  }
+
+  const allOdd = weeks.length > 0 && weeks.every((week) => week % 2 === 1);
+  const allEven = weeks.length > 0 && weeks.every((week) => week % 2 === 0);
+  const continuous = weeks.length > 0 && weeks.length === weeks.at(-1) - weeks[0] + 1;
+  const presentation = {
+    weeks,
+    startWeek: weeks[0] ?? null,
+    endWeek: weeks.at(-1) ?? null,
+    weekRule: ranges.join(","),
+    weekText: ranges.length ? `(${ranges.join(",")}周)` : "",
+    weekType: allOdd ? "odd" : allEven ? "even" : continuous ? "all" : "mixed",
+    weekTypeLabel: allOdd ? "单周" : allEven ? "双周" : continuous ? "全周" : "混合周",
+  };
+  cache.set(weekMask, presentation);
+  return presentation;
+}
+
+function createInitialDataFromV2(common, roomPayload, availability) {
+  const periodIndexByCode = Object.fromEntries(common.timeSlots.map((slot, index) => [slot.code, index]));
+  const slotCount = common.weekdays.length * common.timeSlots.length;
+  const occupancyMasks = Array.from(
+    { length: roomPayload.rooms.length },
+    () => new Int32Array(slotCount),
+  );
+
+  availability.weeks.forEach((days, weekIndex) => {
+    days.forEach((periods, weekdayIndex) => {
+      periods.forEach((roomIds, periodIndex) => {
+        roomIds.forEach((roomId) => {
+          const masks = occupancyMasks[roomId];
+          if (masks) masks[weekdayIndex * common.timeSlots.length + periodIndex] |= 1 << weekIndex;
+        });
+      });
+    });
+  });
+
+  const rooms = roomPayload.rooms.map((room) => ({
+    id: room.id,
+    name: room.name,
+    zone: common.zones[room.zone] ?? "未知区域",
+    building: common.buildings[room.building] ?? "未知楼栋",
+    floor: common.floors[room.floor] ?? "未知",
+    roomNumber: room.roomNumber,
+    occupancyMasks: occupancyMasks[room.id] ?? new Int32Array(slotCount),
+    periodIndexByCode,
+    periodCount: common.timeSlots.length,
+  }));
+
+  return {
+    generatedAt: common.generatedAt,
+    sourceFile: common.sourceFiles?.classroom ?? "",
+    weekdays: common.weekdays,
+    timeSlots: common.timeSlots,
+    summary: {
+      totalRooms: rooms.length,
+      totalEntries: 0,
+      maxWeek: availability.weeks.length,
+      totalZones: common.zones.length,
+      totalFloors: common.floors.length,
+    },
+    rooms,
+    v2Common: common,
+  };
+}
+
+function createRoomSlots(entries, data) {
+  const slots = Object.fromEntries(
+    data.weekdays.map((day) => [
+      String(day.index),
+      Object.fromEntries(data.timeSlots.map((slot) => [slot.code, []])),
+    ]),
+  );
+  entries.forEach((entry) => {
+    slots[String(entry.weekday)]?.[entry.periodCode]?.push(entry);
+  });
+  return slots;
+}
+
+function createScheduleDataFromV2(schedule, data) {
+  const common = data.v2Common;
+  const weekPresentationCache = new Map();
+  const roomNames = data.rooms.map((room) => room.name);
+  const baseEntries = schedule.events.map((event, eventId) => {
+    const [roomId, courseId, teacherIds, classIds, weekdayIndex, periodIndex, weekMask, classGroupIds] = event;
+    const week = getWeekPresentation(weekMask, data.summary.maxWeek, weekPresentationCache);
+    const teacherNames = teacherIds.map((id) => common.teachers[id]).filter(Boolean);
+    const classNames = classIds.map((id) => common.classes[id]).filter(Boolean);
+    const classGroups = classGroupIds.map((id) => common.classGroups[id]).filter(Boolean);
+    const weekday = data.weekdays[weekdayIndex];
+    const period = data.timeSlots[periodIndex];
+
+    return {
+      eventId,
+      roomId,
+      courseName: common.courses[courseId] ?? "未命名课程",
+      teacher: teacherNames.join(" / "),
+      classGroup: classNames.join("、") || classGroups.join("、"),
+      rawClassGroups: classGroups,
+      teacherNames,
+      classNames,
+      roomName: roomNames[roomId] ?? "未标注教室",
+      weekday: weekday?.index ?? weekdayIndex + 1,
+      weekdayLabel: weekday?.label ?? "",
+      periodCode: period?.code ?? "",
+      ...week,
+    };
+  });
+
+  const entries = [];
+  const teacherEntries = [];
+  const courseEntries = [...baseEntries];
+  baseEntries.forEach((entry) => {
+    const teacherNames = entry.teacherNames.length ? entry.teacherNames : [entry.teacher];
+    const classNames = entry.classNames.length ? entry.classNames : [entry.classGroup];
+    teacherNames.filter(Boolean).forEach((teacher) => teacherEntries.push({ ...entry, teacher }));
+    classNames.filter(Boolean).forEach((classGroup) => entries.push({ ...entry, classGroup }));
+  });
+
+  return { entries, courseEntries, teacherEntries, roomEntries: baseEntries };
+}
+
+function hydrateRoomsWithSchedule(data, scheduleData) {
+  const entriesByRoom = new Map();
+  scheduleData.roomEntries.forEach((entry) => {
+    if (entry.roomId < 0) return;
+    if (!entriesByRoom.has(entry.roomId)) entriesByRoom.set(entry.roomId, []);
+    entriesByRoom.get(entry.roomId).push(entry);
+  });
+
+  return {
+    ...data,
+    rooms: data.rooms.map((room) => {
+      const entries = entriesByRoom.get(room.id) ?? [];
+      return {
+        ...room,
+        entries,
+        slots: createRoomSlots(entries, data),
+      };
+    }),
+  };
+}
+
+function normalizeDirectoryQuery(value, view) {
+  const normalized = String(value ?? "").normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+  return view === "teachers" ? normalized.replace(/(?:老师|教授)$/u, "") : normalized;
+}
+
+function intersectSortedIds(left, right) {
+  const result = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    if (left[leftIndex] === right[rightIndex]) {
+      result.push(left[leftIndex]);
+      leftIndex += 1;
+      rightIndex += 1;
+    } else if (left[leftIndex] < right[rightIndex]) {
+      leftIndex += 1;
+    } else {
+      rightIndex += 1;
+    }
+  }
+  return result;
+}
+
+function getDirectoryEntityIds(directoryData, common, view, query) {
+  const key = view === "courses" ? "courses" : view === "teachers" ? "teachers" : "classes";
+  const index = directoryData?.[key];
+  const labels = common?.[key] ?? [];
+  const normalizedQuery = normalizeDirectoryQuery(query, key);
+  if (!index || !normalizedQuery) return [];
+
+  const terms = normalizedQuery.length > 1
+    ? Array.from({ length: normalizedQuery.length - 1 }, (_, position) => normalizedQuery.slice(position, position + 2))
+    : [normalizedQuery];
+  const candidateLists = terms
+    .map((term) => index.terms?.[term])
+    .filter((ids) => Array.isArray(ids))
+    .sort((left, right) => left.length - right.length);
+  if (!candidateLists.length) return [];
+
+  const candidates = candidateLists.reduce(intersectSortedIds);
+  return candidates.filter((id) => normalizeDirectoryQuery(labels[id], key).includes(normalizedQuery));
 }
 
 /* 创建一个查询快照对象，包含当前的视图、时间模式、选定的周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个包含这些信息的对象： */
@@ -1062,7 +1281,21 @@ function DirectoryEmptyState({ view, hasQuery, onReset }) {
 }
 
 /* 创建一个实体结果卡片组件，显示实体的图标、标签、课程数、教师数、班级数和教室数，并提供查看周课表的操作。接受视图类型、标签、条目列表和打开回调函数作为属性： */
-function EntityResultCard({ view, label, entries, onOpen }) {
+function EntityResultCard({ view, label, entries, eventCount, onOpen }) {
+  if (eventCount !== undefined) {
+    const Icon = view === "courses" ? BookOpen : view === "teachers" ? UserRound : Users;
+    return (
+      <button className="entity-result-card" onClick={() => onOpen(view, label)} type="button">
+        <span className="entity-result-icon"><Icon size={18} /></span>
+        <span className="entity-result-copy">
+          <strong>{label}</strong>
+          <small>{eventCount} 项课表安排</small>
+        </span>
+        <span className="entity-result-action">查看周课表 <ArrowUpRight size={15} /></span>
+      </button>
+    );
+  }
+
   const courseCount = new Set(entries.map((entry) => entry.courseName).filter(Boolean)).size;
   const teacherCount = new Set(entries.map((entry) => entry.teacher).filter(Boolean)).size;
   const classCount = new Set(entries.map((entry) => entry.classGroup).filter(Boolean)).size;
@@ -1412,8 +1645,34 @@ function RoomDialog({
   isFavorite,
   onToggleFavorite,
   onNavigate,
+  scheduleReady,
+  scheduleError,
 }) {
   if (!room) return null;
+  if (!scheduleReady) {
+    return (
+      <Modal open={Boolean(room)} onOpenChange={onClose} className="dialog dialog-room">
+        <div className="dialog-header">
+          <div>
+            <div className="eyebrow">教室详情</div>
+            <h2>{room.name}</h2>
+            <p>
+              <MapPin size={14} />
+              {room.building} · {room.floor} 层 · {room.zone.replace("普通教学区", "教学区")}
+            </p>
+          </div>
+          <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
+            <X size={19} />
+          </button>
+        </div>
+        <div className="empty-state">
+          <LoaderCircle size={28} className="loading-spinner" />
+          <h3>{scheduleError ? "课表加载失败" : "正在加载完整课表"}</h3>
+          <p>{scheduleError || "教室占用情况已加载，正在按需读取课程详情。"}</p>
+        </div>
+      </Modal>
+    );
+  }
   /* 获取教室在当前选定的周次、星期几和节次的占用情况，并根据选定的节次获取对应的时间段信息。然后根据选定的星期几获取对应的星期信息，并将选定的节次标签拼接成字符串。接着获取教室在当前周次的每一天的空闲情况概览，以及教室在当前周次、星期几和节次之后的下一次课程信息： */
   const occupied = getRoomEntriesForPeriods(room, selectedWeekday, selectedPeriods, selectedWeek);
   const selectedSlots = data.timeSlots.filter((slot) => selectedPeriods.includes(slot.code));
@@ -1942,7 +2201,7 @@ function CommandDialog({
     if (!data || !normalizedQuery) return [];
     const hits = [];
     for (const room of data.rooms) {
-      for (const entry of room.entries) {
+      for (const entry of room.entries ?? []) {
         const text = [entry.courseName, entry.teacher, entry.classGroup, room.name].join(" ").toLowerCase();
         if (text.includes(normalizedQuery)) {
           hits.push({ room, entry });
@@ -2113,6 +2372,9 @@ function App() {
   const isMac = typeof window !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
   const [data, setData] = useState(null);
   const [scheduleData, setScheduleData] = useState(null);
+  const [directoryData, setDirectoryData] = useState(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [lazyLoadError, setLazyLoadError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -2150,16 +2412,24 @@ function App() {
   const [urlInitialized, setUrlInitialized] = useState(false);
   const autoInitialized = useRef(false);
   const [currentNow, setCurrentNow] = useState(() => new Date());
+  const dataRef = useRef(null);
+  const manifestRef = useRef(null);
+  const directoryRef = useRef(null);
+  const scheduleRef = useRef(null);
+  const directoryPromiseRef = useRef(null);
+  const schedulePromiseRef = useRef(null);
 
-/* 使用 useEffect 钩子在组件挂载时加载数据文件、课程索引和设置文件，并更新加载进度和阶段信息。如果加载过程中发生错误，则设置错误状态。使用取消标志来防止在组件卸载后更新状态： */
+/* 首屏只加载 v2 公共数据、教室和占用索引；目录和完整课表由后续交互按需读取。 */
   useEffect(() => {
     let cancelled = false;
 
     async function loadResources() {
       const sourceLabel = (index) => RESOURCE_SOURCE_LABELS[index] ?? `备用源 ${index + 1}`;
       const resourceProgresses = {
-        data: 0,
-        schedule: 0,
+        manifest: 0,
+        common: 0,
+        rooms: 0,
+        availability: 0,
         settings: 0,
       };
       let failed = false;
@@ -2195,17 +2465,26 @@ function App() {
       try {
         setLoadNotice("");
         setLoadProgress(0);
-        setLoadStage("正在加载：数据文件 0%、课程索引 0%、设置 0%");
+        setLoadStage("正在加载：数据版本 0%、公共字典 0%、教室信息 0%、占用索引 0%、设置 0%");
 
-        const [dataValue, scheduleValue, settingsValue] = await Promise.all([
-          loadResource("data", DATA_URLS),
-          loadResource("schedule", SCHEDULE_URLS),
+        const manifestValue = await loadResource("manifest", V2_MANIFEST_URLS);
+        const getManifestUrls = (key) => {
+          const filePath = manifestValue?.files?.[key]?.path;
+          if (!filePath) throw new Error(`v2 数据版本缺少 ${key} 文件`);
+          return getV2ResourceUrls(filePath);
+        };
+        const [commonValue, roomsValue, availabilityValue, settingsValue] = await Promise.all([
+          loadResource("common", getManifestUrls("common")),
+          loadResource("rooms", getManifestUrls("rooms")),
+          loadResource("availability", getManifestUrls("availability")),
           loadResource("settings", SETTINGS_URLS),
         ]);
 
         if (cancelled) return;
-        setData(dataValue);
-        setScheduleData(scheduleValue);
+        const initialData = createInitialDataFromV2(commonValue, roomsValue, availabilityValue);
+        manifestRef.current = manifestValue;
+        dataRef.current = initialData;
+        setData(initialData);
         setLoadNotice("");
         setLoadStage("正在初始化...");
 
@@ -2260,6 +2539,78 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  const loadV2Resource = useCallback(async (key) => {
+    const filePath = manifestRef.current?.files?.[key]?.path;
+    if (!filePath) throw new Error(`v2 数据版本缺少 ${key} 文件`);
+    return fetchJsonFromUrls(getV2ResourceUrls(filePath), {
+      onFallback: ({ sourceIndex, nextSourceIndex }) => {
+        const sourceLabel = (index) => RESOURCE_SOURCE_LABELS[index] ?? `备用源 ${index + 1}`;
+        setLoadNotice(`${key}：${sourceLabel(sourceIndex)} 加载失败，正在重试 ${sourceLabel(nextSourceIndex)}。`);
+      },
+    });
+  }, []);
+
+  const ensureDirectory = useCallback(async () => {
+    if (directoryRef.current) return directoryRef.current;
+    if (directoryPromiseRef.current) return directoryPromiseRef.current;
+
+    directoryPromiseRef.current = loadV2Resource("directory")
+      .then((value) => {
+        directoryRef.current = value;
+        setDirectoryData(value);
+        return value;
+      })
+      .catch((error) => {
+        setLazyLoadError(error.message);
+        return null;
+      })
+      .finally(() => {
+        directoryPromiseRef.current = null;
+      });
+    return directoryPromiseRef.current;
+  }, [loadV2Resource]);
+
+  const ensureSchedule = useCallback(async () => {
+    if (scheduleRef.current) return scheduleRef.current;
+    if (schedulePromiseRef.current) return schedulePromiseRef.current;
+
+    setScheduleLoading(true);
+    schedulePromiseRef.current = loadV2Resource("schedule")
+      .then((value) => {
+        const currentData = dataRef.current;
+        if (!currentData) throw new Error("教室基础数据尚未准备完成");
+        const nextScheduleData = createScheduleDataFromV2(value, currentData);
+        const hydratedData = hydrateRoomsWithSchedule(currentData, nextScheduleData);
+        scheduleRef.current = nextScheduleData;
+        dataRef.current = hydratedData;
+        setScheduleData(nextScheduleData);
+        setData(hydratedData);
+        return nextScheduleData;
+      })
+      .catch((error) => {
+        setLazyLoadError(error.message);
+        return null;
+      })
+      .finally(() => {
+        setScheduleLoading(false);
+        schedulePromiseRef.current = null;
+      });
+    return schedulePromiseRef.current;
+  }, [loadV2Resource]);
+
+  useEffect(() => {
+    if (activeView !== "available") void ensureDirectory();
+  }, [activeView, ensureDirectory]);
+
+  useEffect(() => {
+    if (selectedRoom || selectedEntity || commandOpen) {
+      void ensureSchedule();
+    }
+    if (selectedEntity || commandOpen) {
+      void ensureDirectory();
+    }
+  }, [commandOpen, ensureDirectory, ensureSchedule, selectedEntity, selectedRoom]);
   
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showResultsJump, setShowResultsJump] = useState(false);
@@ -2487,6 +2838,32 @@ function App() {
       .map(([label, entries]) => ({ label, entries }));
   }, [activeView, query, roomByName, scheduleData, selectedBuildings, selectedFloors, selectedZones]);
 
+  const hasLocationFilters = Boolean(selectedBuildings.length || selectedFloors.length || selectedZones.length);
+  const lazyDirectoryResults = useMemo(() => {
+    if (!data || !directoryData || scheduleData || hasLocationFilters) return [];
+    if (!["courses", "teachers", "classes"].includes(activeView) || !query.trim()) return [];
+
+    const key = activeView === "courses" ? "courses" : activeView === "teachers" ? "teachers" : "classes";
+    const labels = data.v2Common?.[key] ?? [];
+    const entityEvents = new Map((directoryData[key]?.entities ?? []).map(([id, eventIds]) => [id, eventIds]));
+    return getDirectoryEntityIds(directoryData, data.v2Common, activeView, query)
+      .map((id) => ({
+        label: labels[id],
+        entries: [],
+        eventCount: entityEvents.get(id)?.length ?? 0,
+      }))
+      .filter((item) => Boolean(item.label));
+  }, [activeView, data, directoryData, hasLocationFilters, query, scheduleData]);
+
+  useEffect(() => {
+    if (activeView !== "available" && hasLocationFilters) {
+      void ensureSchedule();
+    }
+  }, [activeView, ensureSchedule, hasLocationFilters]);
+
+  const visibleEntityCards = scheduleData
+    ? activeView === "courses" ? courseCards : directoryResults
+    : lazyDirectoryResults;
   const displayRooms = onlyAvailable ? availableRooms : filteredRooms;
   const roomGroups = useMemo(() => groupRoomsByBuildingAndFloor(displayRooms), [displayRooms]);
   const occupiedCount = filteredRooms.length - availableRooms.length;
@@ -2669,6 +3046,7 @@ function App() {
     setSelectedRoom(room);
     setSelectedEntity(null);
     setCommandOpen(false);
+    void ensureSchedule();
   }
   /* 切换视图的函数 */
   function changeView(view) {
@@ -2690,6 +3068,7 @@ function App() {
   /* 打开实体卡片的函数 */
   function openEntityCard(view, label) {
     if (!label) return;
+    void ensureSchedule();
     const nextView = normalizeView(view);
     saveRecentQuery({
       ...querySnapshot,
@@ -2721,7 +3100,7 @@ function App() {
     );
   }
   /*如果数据尚未加载完成或设置尚未加载完成，则显示一个加载屏幕组件，显示当前的加载进度和阶段信息： */
-  if (!data || !scheduleData || !settingsLoaded) {
+  if (!data || !settingsLoaded) {
     return <LoadingScreen progress={loadProgress} stage={loadStage} notice={loadNotice} />;
   }
   /*如果数据和设置都已加载完成，则渲染应用程序的主界面，包括顶部栏、主内容区域、通知中心、筛选栏等。根据当前的状态变量，显示不同的视图和组件： */
@@ -3071,7 +3450,7 @@ function App() {
                                 <RoomCard
                                   key={room.name}
                                   room={room}
-                                  onOpen={setSelectedRoom}
+                                  onOpen={openRoom}
                                   selectedWeek={selectedWeek}
                                   selectedWeekday={selectedWeekday}
                                   selectedPeriods={selectedPeriods}
@@ -3089,43 +3468,23 @@ function App() {
                   <EmptyState hasQuery={hasFilters} onReset={resetFilters} />
                 )}
               </>
-            ) : activeView === "courses" ? (
-              <div className="course-results">
-                {courseCards.length ? (
-                  courseCards.slice(0, settings.searchResultLimit).map(({ label, entries }) => (
-                    <EntityResultCard
-                      key={label}
-                      view="courses"
-                      label={label}
-                      entries={entries}
-                      onOpen={openEntityCard}
-                    />
-                  ))
-                ) : (
-                  <DirectoryEmptyState view="courses" hasQuery={Boolean(query)} onReset={() => setQuery("")} />
-                )}
-                {courseCards.length > settings.searchResultLimit ? (
-                  <p className="result-limit">
-                    结果较多，仅展示前 {settings.searchResultLimit} 条，请继续缩小搜索范围。
-                  </p>
-                ) : null}
-              </div>
             ) : (
               <div className="course-results">
-                {directoryResults.length ? (
-                  directoryResults.slice(0, settings.searchResultLimit).map(({ label, entries }) => (
+                {visibleEntityCards.length ? (
+                  visibleEntityCards.slice(0, settings.searchResultLimit).map(({ label, entries, eventCount }) => (
                     <EntityResultCard
                       key={label}
                       view={activeView}
                       label={label}
                       entries={entries}
+                      eventCount={eventCount}
                       onOpen={openEntityCard}
                     />
                   ))
                 ) : (
                   <DirectoryEmptyState view={activeView} hasQuery={Boolean(query)} onReset={() => setQuery("")} />
                 )}
-                {directoryResults.length > settings.searchResultLimit ? (
+                {visibleEntityCards.length > settings.searchResultLimit ? (
                   <p className="result-limit">
                     结果较多，仅展示前 {settings.searchResultLimit} 条，请继续缩小搜索范围。
                   </p>
@@ -3166,7 +3525,7 @@ function App() {
       </footer>
 
       <RoomDialog
-        room={selectedRoom}
+        room={selectedRoom ? roomByName.get(selectedRoom.name) ?? selectedRoom : null}
         data={data}
         selectedWeek={selectedWeek}
         selectedWeekday={selectedWeekday}
@@ -3175,6 +3534,8 @@ function App() {
         isFavorite={selectedRoom ? favoriteSet.has(selectedRoom.name) : false}
         onToggleFavorite={toggleFavorite}
         onNavigate={navigateToEntity}
+        scheduleReady={Boolean(scheduleData)}
+        scheduleError={lazyLoadError}
       />
 
       <EntityScheduleDialog
