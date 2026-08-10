@@ -203,3 +203,47 @@ public/
    特别提醒可能会出现：电科25B班,旅游25AB班,电信25A班,电信25B班,法学25CD班,法学25AB班,通信25A班,通信25B班,电科25A班,自动化25A班,自动化25B班,25日语A 这种班级，但其实是多个班混合，并不是很长的班级名，解析时需要拆开
    同样的：一个班课表同一节课可能会有多个老师上课，注意拆分
    最重要的是多表关联一致性。
+
+ 已完成 v2 数据管道第一阶段。
+
+  - 新增 /D:/Projects/campus-course-assistant/scripts/build-data-v2.js 和 /D:/Projects/campus-course-assistant/scripts/verify-data-v2.js，生成并校验 manifest/common/rooms/availability/schedule/directory 六个文
+    件。
+
+  - /D:/Projects/campus-course-assistant/public/data/v2/schedule.json 仅存数值 ID，不含中文；课程、教师、班级名称与原始组合班文本放在 common.json。
+  - 组合班会展开为独立实体，例如 财务管理25AB班 拆为 财务管理25A班、财务管理25B班；可通过 /D:/Projects/campus-course-assistant/scripts/class-normalization.json 配置别名或特殊拆分。
+  - availability.json 已与旧结构逐项比对：18 周、7 天、6 节次共 756 个占用结果完全一致。
+  - v2 全量数据 Brotli 约 123KB，相比旧两份数据约 281KB；迁移前端后，首屏可仅加载公共字典、教室和占用索引。
+  - 解析器支持 SCHEDULE_SOURCE_DIR=.source-data，.source-data/ 已忽略；GitHub Pages 工作流不再解析根目录的大型 HTML，只发布已生成数据。
+
+  已更新 /D:/Projects/campus-course-assistant/package.json、/D:/Projects/campus-course-assistant/README.md、/D:/Projects/campus-course-assistant/MAINTENANCE.md 和部署工作流。
+
+  验证已通过：
+
+  npm run verify-data-v2
+  v2 data verified: 283 rooms, 4820 events, 756 availability slots.
+
+  npm run build
+  ✓ built successfully
+ 已改为按需加载 v2。
+
+  /D:/Projects/campus-course-assistant/src/App.jsx 现在：
+
+  - 首屏仅请求 manifest.json、common.json、rooms.json、availability.json 和设置文件。
+  - 空闲教室筛选直接使用 availability.json 的占用位掩码，不再下载旧版大 JSON。
+  - 课程、教师、班级搜索先读取 directory.json 倒排索引。
+  - 打开教室详情、实体课表、命令面板或使用地点筛选时，才请求并转换 schedule.json。
+  - 已移除 App.jsx 对 classroom-data.json、schedule-index.json 的运行时引用。
+
+  验证通过：
+
+  npm run build
+  ✓ built successfully
+
+  npm run verify-data-v2
+  v2 data verified: 283 rooms, 4820 events, 756 availability slots.
+
+  本地开发服务器仍在运行：
+
+  http://127.0.0.1:4173/
+
+  六个 v2 文件均已验证可访问。文档已同步更新为 v2 运行时方案。

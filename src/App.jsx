@@ -1577,7 +1577,7 @@ function NotificationCenterDialog({ open, notifications, onClose }) {
           <h2>全部通知</h2>
           <p>共 {notifications.length} 条通知</p>
         </div>
-        <button className="icon-button" onClick={onClose} type="button" aria-label="关闭通知中心" title="关闭通知中心">
+        <button className="icon-button dialog-close" onClick={onClose} type="button" aria-label="关闭通知中心" title="关闭通知中心">
           <X size={19} />
         </button>
       </div>
@@ -1718,7 +1718,7 @@ function RoomDialog({
                 <ArrowLeft size={18} />
               </button>
             ) : null}
-            <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
+            <button className="icon-button dialog-close" onClick={onClose} type="button" aria-label="关闭">
               <X size={19} />
             </button>
           </div>
@@ -1726,7 +1726,7 @@ function RoomDialog({
         <div className="empty-state">
           <LoaderCircle size={28} className="loading-spinner" />
           <h3>{scheduleError ? "课表加载失败" : "正在加载完整课表"}</h3>
-          <p>{scheduleError || "教室占用情况已加载，正在按需读取课程详情。"}</p>
+          <p>{scheduleError || "请稍候"}</p>
         </div>
       </Modal>
     );
@@ -1766,7 +1766,7 @@ function RoomDialog({
           >
             <Heart size={18} fill={isFavorite ? "currentColor" : "none"} />
           </button>
-          <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
+          <button className="icon-button dialog-close" onClick={onClose} type="button" aria-label="关闭">
             <X size={19} />
           </button>
         </div>
@@ -2113,7 +2113,7 @@ function EntityScheduleDialog({
               <ArrowLeft size={18} />
             </button>
           ) : null}
-          <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
+          <button className="icon-button dialog-close" onClick={onClose} type="button" aria-label="关闭">
             <X size={19} />
           </button>
         </div>
@@ -2291,11 +2291,11 @@ function CommandDialog({
           ref={inputRef}
           value={commandQuery}
           onChange={(event) => setCommandQuery(event.target.value)}
-          placeholder="搜索教室、楼栋、课程、教师或班级"
+          placeholder="搜索教室、课程、教师或班级"
         />
-        <span className="command-shortcut">
-          <Command size={12} /> K
-        </span>
+        <button className="icon-button command-close" onClick={() => onOpenChange(false)} type="button" aria-label="关闭" title="关闭">
+          <X size={18} />
+        </button>
       </div>
 
       <div className="command-body">
@@ -2406,7 +2406,7 @@ function LoadingScreen({ progress, stage, notice }) {
           </div>
           <div>
             <strong>校园课程助手</strong>
-            <span>正在准备数据·可能需要较长时间</span>
+            <span>正在准备数据 · 可能需要较长时间</span>
           </div>
           <LoaderCircle className="loader" size={18} />
         </div>
