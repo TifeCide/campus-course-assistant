@@ -246,6 +246,38 @@ GitHub Actions 只构建已提交的数据，不再解析原始 HTML。因此更
 
 班级组合文本按逗号分段，段末的 `班` 仅作为分隔标记移除，例如 `工业设计26班,电信26B班` 生成 `工业设计26` 和 `电信26B`。`新闻26AB`、`新闻26CD` 等带字母后缀的班级保持原样；只有在 `scripts/class-normalization.json` 的 `splits` 中显式配置时才会拆分。
 
+各 v2 文件的职责与加载时机：
+
+| 文件 | 首屏是否读取 | 主要内容 |
+| --- | --- | --- |
+| `manifest.json` | 是 | v2 文件入口、版本摘要、各文件哈希与大小 |
+| `common.json` | 是 | 学期与时间段字典、课程/教师/班级名称字典 |
+| `rooms.json` | 是 | 教室基础信息（楼栋、楼层、区域等） |
+| `availability.json` | 是 | 按周/星期/节次组织的占用位图索引，用于空闲教室筛选 |
+| `directory.json` | 否（按需） | 课程/教师/班级目录索引，供搜索入口快速筛选 |
+| `schedule.json` | 否（按需） | 规范化课程事件明细，供教室详情和实体课表使用 |
+
+补充细节：
+
+- 首屏进度条按资源估算大小加权，当前估算包含 `manifest/common/rooms/availability/setting`，不包含按需加载文件。
+- 当某个来源失败时，加载页会显示“失败来源 -> 正在切换到下一个来源”的提示，便于判断是当前部署、CDN 还是 GitHub Pages 故障。
+- `manifest.json` 的 `files.*.path` 是前端后续读取路径的唯一入口，手工改文件名时必须同步更新 manifest。
+- 目录检索优先使用 `directory.json` 的实体索引；一旦启用位置筛选（楼栋/楼层/区域），会切换到完整课表数据做精确过滤。
+
+### 数据源回退顺序（运行时）
+
+所有运行时 JSON（`setting.json` 和 v2 文件）都使用同一回退顺序：
+
+1. 当前部署路径（`import.meta.env.BASE_URL`，例如 Cloudflare Pages 的当前站点）
+2. jsDelivr CDN（`https://cdn.jsdelivr.net/gh/TifeCide/campus-course-assistant@main/public/`）
+3. GitHub Pages（`https://tifecide.github.io/campus-course-assistant/`）
+
+补充细节：
+
+- 回退是“单资源独立回退”：例如 `availability.json` 失败会单独回退，不会重置已成功的 `common.json`。
+- 若三个来源都失败，页面会进入加载失败状态，需检查文件发布状态、仓库路径、跨域策略和 JSON 格式。
+- `vite.config.js` 默认 `base: "./"`，因此项目可部署到根路径和子路径；若部署到子路径，建议用 `VITE_BASE_PATH=/your-path/ npm run build` 重新构建。
+
 ## 网站配置
 
 配置文件：
@@ -289,6 +321,19 @@ public/data/setting.json
   "schoolTimeZone": "Asia/Shanghai"
 }
 ```
+
+配置优先级与容错：
+
+1. 代码内置默认值（`src/App.jsx` 的 `DEFAULT_SETTINGS`）
+2. `public/data/setting.json`（运行时覆盖默认值）
+3. URL 查询参数（仅覆盖查询条件，不覆盖站点设置项）
+
+补充细节：
+
+- `enableCommandPalette` / `enableBackToTop` / `stickyFilters`：仅当值显式为 `false` 时关闭，缺失时按开启处理。
+- `searchResultLimit` 读取时会转为数字，空值或非法值会回退到默认值。
+- `maskMessage` 兼容旧字段拼写（`tittle`）并归一化到 `title`。
+- `schoolTimeZone` 当前仅作为配置字段保留，应用内部日期判断固定按 `Asia/Shanghai` 执行。
 
 ### 学期阶段显示
 
@@ -344,6 +389,12 @@ public/data/setting.json
 | `classroom-recent-queries` | 最近查询条件 |
 | `classroom-dismissed-notifications` | 已关闭的通知编号 |
 
+补充细节：
+
+- 数据按“当前域名 + 浏览器”隔离；同一仓库在不同域名（Cloudflare Pages / GitHub Pages）之间不共享本地状态。
+- 隐私模式、受限 WebView 或浏览器策略可能禁用 `localStorage`；应用会静默降级为“仅当前会话可见”，不阻断查询功能。
+- 最近查询会持久化查询快照，切换视图时可能影响“返回后显示内容”，排查时可先清空 `classroom-recent-queries`。
+
 调试时如需清除这些状态，可以在浏览器控制台执行：
 
 ```js
@@ -351,6 +402,39 @@ localStorage.removeItem("classroom-favorites");
 localStorage.removeItem("classroom-recent-queries");
 localStorage.removeItem("classroom-dismissed-notifications");
 ```
+
+## URL 查询参数
+
+查询条件会同步到 URL，可直接复制链接共享当前筛选状态。当前支持的参数：
+
+| 参数 | 含义 | 示例 |
+| --- | --- | --- |
+| `view` | 视图：`available` / `courses` / `teachers` / `classes` | `view=available` |
+| `mode` | 时间模式：`week`（默认）或 `date` | `mode=date` |
+| `date` | 指定日期（`YYYY-MM-DD`） | `date=2026-09-07` |
+| `week` | 教学周（仅 `mode=week`） | `week=3` |
+| `weekday` | 星期（1-7，仅 `mode=week`） | `weekday=2` |
+| `periods` | 节次编码，多个值用逗号分隔 | `periods=0304,0506` |
+| `periodMode` | 节次模式：`single`（默认）/ `multiple` | `periodMode=multiple` |
+| `available` | 是否仅看空闲：`1`（默认）/ `0` | `available=0` |
+| `buildings` | 楼栋筛选，多个值用逗号分隔 | `buildings=厚德楼,博学楼` |
+| `floors` | 楼层筛选，多个值用逗号分隔 | `floors=2,3` |
+| `zones` | 区域筛选，多个值用逗号分隔 | `zones=普通教学区` |
+
+参数默认值与容错规则：
+
+- 缺失 `view` 时默认 `available`；非法值也会回退到 `available`。
+- 缺失 `mode` 时默认 `week`。
+- `week`、`weekday` 非数字时会回退默认值；初始化后会再次按数据范围钳制（周次在 `1..summary.maxWeek`，星期在 `1..7`）。
+- `periods` 为空时默认 `0102`；`periodMode=single` 时只保留一个节次。
+- `available` 缺失时等价于 `1`（仅显示空闲）；只有显式 `available=0` 才显示全部匹配教室。
+- 当 `mode=date` 时，`date` 参数优先；周次和星期参数不会作为主时间条件参与筛选。
+
+分享链接建议：
+
+1. 如需让对方看到具体教室空闲结果，建议同时包含 `week/weekday/periods`（或 `date/periods`）和位置筛选参数。
+2. 课程/教师/班级视图建议带上 `view` 与 `q`（若使用关键词检索）；若是从实体详情进入，建议带 `entity`。
+3. 链接参数较多时可先清空无关筛选，避免对方打开后结果“看起来不对”。
 
 ## 构建和部署
 
