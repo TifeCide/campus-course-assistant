@@ -102,8 +102,8 @@ function createClassResolver(knownClasses, config, validation) {
     const normalized = normalizeText(value);
     if (!normalized) return "";
     const alias = config.aliases[normalized] ?? config.aliases[getClassKey(normalized)];
-    if (alias) return normalizeText(alias);
-    return knownByKey.get(getClassKey(normalized)) ?? normalized;
+    if (alias) return getClassKey(alias);
+    return getClassKey(knownByKey.get(getClassKey(normalized)) ?? normalized);
   };
 
   function splitClassGroup(value) {
@@ -114,16 +114,7 @@ function createClassResolver(knownClasses, config, validation) {
       return unique(override.map(resolve));
     }
 
-    return splitDelimited(normalized).flatMap((token) => {
-      const match = token.match(/^(.*?\d{2,})([A-Z]{2,})(班?)$/);
-      if (match) {
-        const [, prefix, suffixes, classSuffix] = match;
-        const expanded = [...suffixes].map((suffix) => resolve(`${prefix}${suffix}${classSuffix}`));
-        if (expanded.length > 1) return unique(expanded);
-      }
-
-      return [resolve(token)];
-    });
+    return splitDelimited(normalized).map(resolve);
   }
 
   return { resolve, splitClassGroup };
@@ -143,6 +134,13 @@ function createRegistry(values) {
   };
 }
 
+function createClassSearchTokens(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .match(/[\u3400-\u9fff]|\d+|[a-z]/gu) ?? [];
+}
+
 function createSearchTerms(label, kind) {
   const normalized = normalizeText(label).toLowerCase().replace(/\s+/g, "");
   const base = kind === "teachers"
@@ -155,6 +153,9 @@ function createSearchTerms(label, kind) {
       values.add(value.slice(index, index + 1));
       if (index < value.length - 1) values.add(value.slice(index, index + 2));
     }
+  }
+  if (kind === "classes") {
+    createClassSearchTokens(base).forEach((term) => values.add(term));
   }
 
   return [...values].filter(Boolean);

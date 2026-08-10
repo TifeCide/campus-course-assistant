@@ -35,6 +35,15 @@ function getExpectedEventIds(events, fieldIndex, entityCount) {
   return result.map((ids) => [...new Set(ids)].sort((left, right) => left - right));
 }
 
+function createClassSearchTokens(value) {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/班$/u, "")
+    .match(/[\u3400-\u9fff]|\d+|[a-z]/gu) ?? [];
+}
+
 function verifyManifest(manifest) {
   for (const [name, metadata] of Object.entries(manifest.files ?? {})) {
     const filePath = path.resolve(V2_DIR, `${name}.json`);
@@ -97,6 +106,15 @@ function verifyDirectory(directory, events, common) {
       });
     }
   }
+
+  common.classes.forEach((label, classId) => {
+    for (const term of createClassSearchTokens(label)) {
+      assert(
+        directory.classes.terms[term]?.includes(classId),
+        `Class search term is missing: ${label} -> ${term}`,
+      );
+    }
+  });
 }
 
 function main() {
@@ -111,8 +129,8 @@ function main() {
   verifyManifest(manifest);
   assert(!/[\u3400-\u9fff]/.test(JSON.stringify(schedule)), "schedule.json must not contain Chinese text");
   assert(
-    common.classes.every((label) => !/.*\d{2,}[A-Z]{2,}班?$/.test(label)),
-    "Combined class labels remain in the class dictionary",
+    common.classes.every((label) => !label.endsWith("班")),
+    "Class labels must not retain a trailing 班 separator",
   );
 
   schedule.events.forEach((event, eventId) => {

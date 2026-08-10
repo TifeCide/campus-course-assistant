@@ -244,7 +244,7 @@ GitHub Actions 只构建已提交的数据，不再解析原始 HTML。因此更
 
 前端已使用 `public/data/v2/`：首屏读取 `manifest.json`、`common.json`、`rooms.json` 和 `availability.json`；打开教室详情、实体课表或命令面板时才读取 `schedule.json`；普通课程、教师和班级搜索先使用 `directory.json` 的倒排索引。旧 JSON 仅保留为解析兼容产物。
 
-组合班名称会按后缀展开，例如 `财务管理25AB班` 会生成 `财务管理25A班` 和 `财务管理25B班` 两个实体，原始组合文本仍保存在公共字典中。无法自动处理的别名或拆分规则写入 `scripts/class-normalization.json`。
+班级组合文本按逗号分段，段末的 `班` 仅作为分隔标记移除，例如 `工业设计26班,电信26B班` 生成 `工业设计26` 和 `电信26B`。`新闻26AB`、`新闻26CD` 等带字母后缀的班级保持原样；只有在 `scripts/class-normalization.json` 的 `splits` 中显式配置时才会拆分。
 
 ## 网站配置
 
