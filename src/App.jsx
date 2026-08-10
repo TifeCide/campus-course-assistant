@@ -2,6 +2,7 @@ import React, { Component, useCallback, useEffect, useMemo, useRef, useState } f
 import { createPortal } from "react-dom";
 /*从 lucide-react 导入所需的图标组件 */
 import {
+  ArrowLeft,
   ArrowUpRight,
   ArrowUp,
   ArrowDown,
@@ -804,6 +805,34 @@ function normalizeView(value) {
   return ["available", "courses", "teachers", "classes"].includes(value) ? value : "available";
 }
 
+function normalizeDetailStack(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (item?.type === "room" && item.name) {
+        return { type: "room", name: String(item.name) };
+      }
+      if (item?.type === "entity" && item.label) {
+        return {
+          type: "entity",
+          view: normalizeView(item.view),
+          label: String(item.label),
+          courseFilter: item.courseFilter || "",
+          teacherFilter: item.teacherFilter || "",
+          classFilter: item.classFilter || "",
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function areSameDetails(left, right) {
+  if (!left || !right || left.type !== right.type) return false;
+  if (left.type === "room") return left.name === right.name;
+  return left.view === right.view && left.label === right.label;
+}
+
 /*根据查询快照对象生成对应的 URL 查询字符串，包含视图、时间模式、周次、星期几、日期、节次、建筑物、楼层、区域以及搜索查询和实体标签等信息。返回一个完整的 URL 字符串，包括路径、查询参数和哈希值： */
 function getQueryUrl(snapshot) {
   const params = new URLSearchParams();
@@ -824,8 +853,6 @@ function getQueryUrl(snapshot) {
   if (snapshot.selectedBuildings.length) params.set("buildings", snapshot.selectedBuildings.join(","));
   if (snapshot.selectedFloors.length) params.set("floors", snapshot.selectedFloors.join(","));
   if (snapshot.selectedZones.length) params.set("zones", snapshot.selectedZones.join(","));
-  if (snapshot.query) params.set("q", snapshot.query);
-  if (snapshot.entityLabel) params.set("entity", snapshot.entityLabel);
 
   const queryString = params.toString();
   return `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
@@ -1664,6 +1691,8 @@ function RoomDialog({
   selectedWeekday,
   selectedPeriods,
   onClose,
+  onBack,
+  canGoBack,
   isFavorite,
   onToggleFavorite,
   onNavigate,
@@ -1683,9 +1712,16 @@ function RoomDialog({
               {room.building} · {room.floor} 层 · {room.zone.replace("普通教学区", "教学区")}
             </p>
           </div>
-          <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
-            <X size={19} />
-          </button>
+          <div className="dialog-header-actions">
+            {canGoBack ? (
+              <button className="icon-button" onClick={onBack} type="button" aria-label="返回上一层" title="返回上一层">
+                <ArrowLeft size={18} />
+              </button>
+            ) : null}
+            <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
+              <X size={19} />
+            </button>
+          </div>
         </div>
         <div className="empty-state">
           <LoaderCircle size={28} className="loading-spinner" />
@@ -1716,6 +1752,11 @@ function RoomDialog({
           </p>
         </div>
         <div className="dialog-header-actions">
+          {canGoBack ? (
+            <button className="icon-button" onClick={onBack} type="button" aria-label="返回上一层" title="返回上一层">
+              <ArrowLeft size={18} />
+            </button>
+          ) : null}
           <button
             className={cn("icon-button", "dialog-favorite", isFavorite && "is-favorite")}
             onClick={() => onToggleFavorite(room.name)}
@@ -2001,6 +2042,8 @@ function EntityScheduleDialog({
   maxWeek,
   roomByName,
   onClose,
+  onBack,
+  canGoBack,
   onWeekChange,
   onFilterChange,
   onNavigate,
@@ -2064,9 +2107,16 @@ function EntityScheduleDialog({
             </select>
           </label>
         </div>
-        <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
-          <X size={19} />
-        </button>
+        <div className="dialog-header-actions">
+          {canGoBack ? (
+            <button className="icon-button" onClick={onBack} type="button" aria-label="返回上一层" title="返回上一层">
+              <ArrowLeft size={18} />
+            </button>
+          ) : null}
+          <button className="icon-button" onClick={onClose} type="button" aria-label="关闭">
+            <X size={19} />
+          </button>
+        </div>
       </div>
 
       <div className="dialog-summary">
@@ -2415,8 +2465,7 @@ function App() {
   const [selectedFloors, setSelectedFloors] = useState([]);
   const [selectedZones, setSelectedZones] = useState([]);
   const [query, setQuery] = useState("");
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [selectedEntity, setSelectedEntity] = useState(null);
+  const [detailStack, setDetailStack] = useState([]);
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
@@ -2438,8 +2487,13 @@ function App() {
   const manifestRef = useRef(null);
   const directoryRef = useRef(null);
   const scheduleRef = useRef(null);
+  const detailStackRef = useRef([]);
   const directoryPromiseRef = useRef(null);
   const schedulePromiseRef = useRef(null);
+  const currentDetail = detailStack[detailStack.length - 1] ?? null;
+  const selectedRoom = currentDetail?.type === "room" ? { name: currentDetail.name } : null;
+  const selectedEntity = currentDetail?.type === "entity" ? currentDetail : null;
+  const canNavigateDetailBack = detailStack.length > 1;
 
 /* 首屏只加载 v2 公共数据、教室和占用索引；目录和完整课表由后续交互按需读取。 */
   useEffect(() => {
@@ -2644,6 +2698,15 @@ function App() {
     const timer = window.setInterval(() => setCurrentNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      commitDetailStack(event.state?.detailStack ?? []);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const autoTemporal = useMemo(() => (data ? getAutoTemporalState(data, settings) : null), [data, settings]);
   const currentTime = useMemo(() => getShanghaiParts(currentNow), [currentNow]);
   const currentTemporal = useMemo(
@@ -2706,7 +2769,11 @@ function App() {
 
       setQuery(shared.query);
       setSelectedFloors(shared.selectedFloors);
-      setSelectedEntity(shared.entityLabel ? { view: normalizeView(shared.activeView), label: shared.entityLabel } : null);
+      if (shared.entityLabel) {
+        const nextStack = normalizeDetailStack([{ type: "entity", view: shared.activeView, label: shared.entityLabel }]);
+        detailStackRef.current = nextStack;
+        setDetailStack(nextStack);
+      }
     } else {
       const defaultMode = settings.defaultPeriodMode === "multiple" ? "multiple" : "single";
       setActiveView(settings.defaultView === "courses" ? "courses" : "available");
@@ -2921,7 +2988,7 @@ function App() {
         selectedFloors,
         selectedZones,
         query,
-        entityLabel: selectedEntity?.label ?? "",
+        entityLabel: "",
       }),
     [
       activeView,
@@ -2936,13 +3003,21 @@ function App() {
       selectedFloors,
       selectedZones,
       query,
-      selectedEntity?.label,
     ],
   );
 
   useEffect(() => {
     if (!urlInitialized || !data) return;
-    window.history.replaceState({}, "", getQueryUrl(querySnapshot));
+    const currentState = window.history.state ?? {};
+    window.history.replaceState(
+      {
+        ...currentState,
+        detailDepth: detailStackRef.current.length,
+        detailStack: detailStackRef.current,
+      },
+      "",
+      getQueryUrl(querySnapshot),
+    );
   }, [data, querySnapshot, urlInitialized]);
 
   useEffect(() => {
@@ -2991,8 +3066,7 @@ function App() {
     setSelectedPeriods([defaultTemporal.period]);
     setPeriodSelectionMode(defaultMode);
     setOnlyAvailable(settings.defaultOnlyAvailable !== false);
-    setSelectedEntity(null);
-    setSelectedRoom(null);
+    clearDetails();
     resetFilters();
   }
   /*使用此函数可以将应用程序的状态设置为当前日期和时间对应的周次、星期几和节次。它会调用 getAutoTemporalState 函数来获取当前时间的自动计算状态，并更新相关的状态变量： */
@@ -3004,8 +3078,7 @@ function App() {
     setSelectedPeriods([today.period]);
     setTemporalMode("date");
     setActiveView("available");
-    setSelectedEntity(null);
-    setSelectedRoom(null);
+    clearDetails();
   }
   /*处理日期变化的函数 */
   function handleDateChange(value) {
@@ -3034,8 +3107,7 @@ function App() {
   function applyRecentQuery(snapshot) {
     if (!snapshot) return;
     setActiveView(normalizeView(snapshot.activeView));
-    setSelectedEntity(snapshot.entityLabel ? { view: normalizeView(snapshot.activeView), label: snapshot.entityLabel } : null);
-    setSelectedRoom(null);
+    clearDetails();
     setTemporalMode(snapshot.temporalMode === "date" ? "date" : "week");
     setSelectedWeek(clamp(Number(snapshot.selectedWeek) || DEFAULT_WEEK, 1, data.summary.maxWeek));
     setSelectedWeekday(clamp(Number(snapshot.selectedWeekday) || DEFAULT_WEEKDAY, 1, data.weekdays.length));
@@ -3052,6 +3124,9 @@ function App() {
       setSelectedWeek(dateTemporal.week);
       setSelectedWeekday(dateTemporal.weekday);
     }
+    if (snapshot.entityLabel) {
+      pushDetail({ type: "entity", view: normalizeView(snapshot.activeView), label: snapshot.entityLabel });
+    }
   }
 
   /*保存最近查询的函数 */
@@ -3063,10 +3138,73 @@ function App() {
       return next;
     });
   }
+
+  function replaceDetailHistoryState(nextStack = detailStackRef.current) {
+    const currentState = window.history.state ?? {};
+    window.history.replaceState(
+      {
+        ...currentState,
+        detailDepth: nextStack.length,
+        detailStack: nextStack,
+      },
+      "",
+      window.location.href,
+    );
+  }
+
+  function commitDetailStack(nextStack) {
+    const normalized = normalizeDetailStack(nextStack);
+    detailStackRef.current = normalized;
+    setDetailStack(normalized);
+    return normalized;
+  }
+
+  function pushDetail(detail) {
+    const [normalizedDetail] = normalizeDetailStack([detail]);
+    if (!normalizedDetail) return;
+    const currentStack = detailStackRef.current;
+    const previousDetail = currentStack[currentStack.length - 1];
+    if (areSameDetails(previousDetail, normalizedDetail)) return;
+
+    const nextStack = commitDetailStack([...currentStack, normalizedDetail]);
+    window.history.pushState(
+      {
+        ...(window.history.state ?? {}),
+        detailDepth: nextStack.length,
+        detailStack: nextStack,
+      },
+      "",
+      window.location.href,
+    );
+  }
+
+  function goBackDetail() {
+    if (detailStackRef.current.length <= 1) return;
+    window.history.back();
+  }
+
+  function closeCurrentDetail() {
+    if (!detailStackRef.current.length) return;
+    const stateDepth = Number(window.history.state?.detailDepth) || 0;
+    if (detailStackRef.current.length > 1 && stateDepth === detailStackRef.current.length) {
+      window.history.back();
+      return;
+    }
+
+    const nextStack = commitDetailStack(detailStackRef.current.slice(0, -1));
+    replaceDetailHistoryState(nextStack);
+  }
+
+  function clearDetails() {
+    if (!detailStackRef.current.length) return;
+    const nextStack = commitDetailStack([]);
+    replaceDetailHistoryState(nextStack);
+  }
+
   /* 打开教室的函数 */
   function openRoom(room) {
-    setSelectedRoom(room);
-    setSelectedEntity(null);
+    if (!room?.name) return;
+    pushDetail({ type: "room", name: room.name });
     setCommandOpen(false);
     void ensureSchedule();
   }
@@ -3074,18 +3212,16 @@ function App() {
   function changeView(view) {
     setActiveView(normalizeView(view));
     setQuery("");
-    setSelectedRoom(null);
-    setSelectedEntity(null);
+    clearDetails();
   }
   /* 导航到实体的函数 */
   function navigateToEntity(view, label) {
     if (!label) return;
     const nextView = normalizeView(view);
-    setSelectedRoom(null);
-    setActiveView(nextView);
-    setQuery(label);
-    setSelectedEntity({ view: nextView, label });
+    pushDetail({ type: "entity", view: nextView, label });
     setCommandOpen(false);
+    void ensureDirectory();
+    void ensureSchedule();
   }
   /* 打开实体卡片的函数 */
   function openEntityCard(view, label) {
@@ -3098,11 +3234,10 @@ function App() {
       query: label,
       entityLabel: label,
     });
-    navigateToEntity(nextView, label);
+    pushDetail({ type: "entity", view: nextView, label });
   }
   /* 从实体打开教室的函数 */
   function openRoomFromEntity(room) {
-    setSelectedEntity(null);
     openRoom(room);
   }
   /*如果加载数据时发生错误，则显示一个加载失败的界面，提示用户数据加载失败，并提供重新加载按钮和联系开发者的链接： */
@@ -3552,7 +3687,9 @@ function App() {
         selectedWeek={selectedWeek}
         selectedWeekday={selectedWeekday}
         selectedPeriods={selectedPeriods}
-        onClose={() => setSelectedRoom(null)}
+        onClose={closeCurrentDetail}
+        onBack={goBackDetail}
+        canGoBack={canNavigateDetailBack}
         isFavorite={selectedRoom ? favoriteSet.has(selectedRoom.name) : false}
         onToggleFavorite={toggleFavorite}
         onNavigate={navigateToEntity}
@@ -3571,13 +3708,22 @@ function App() {
         currentTemporal={currentTemporal}
         maxWeek={data.summary.maxWeek}
         roomByName={roomByName}
-        onClose={() => setSelectedEntity(null)}
-          onWeekChange={(week) => {
+        onClose={closeCurrentDetail}
+        onBack={goBackDetail}
+        canGoBack={canNavigateDetailBack}
+        onWeekChange={(week) => {
           setSelectedWeek(clamp(week, 1, data.summary.maxWeek));
           setTemporalMode("week");
         }}
         onFilterChange={(key, value) => {
-          setSelectedEntity((current) => current ? { ...current, [key]: value } : current);
+          commitDetailStack(
+            detailStackRef.current.map((item, index) =>
+              index === detailStackRef.current.length - 1 && item.type === "entity"
+                ? { ...item, [key]: value }
+                : item,
+            ),
+          );
+          replaceDetailHistoryState();
         }}
         onNavigate={navigateToEntity}
         onOpenRoom={openRoomFromEntity}
