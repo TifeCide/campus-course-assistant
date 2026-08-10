@@ -4,19 +4,20 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "..");
+const SOURCE_DIR = path.resolve(process.env.SCHEDULE_SOURCE_DIR || PROJECT_ROOT);
 const OUTPUT_FILE = path.resolve(PROJECT_ROOT, "public", "data", "classroom-data.json");
 
 function findLatestSourceFile() {
   const candidates = fs
-    .readdirSync(PROJECT_ROOT)
+    .readdirSync(SOURCE_DIR)
     .filter((fileName) => /^kbxx_classroom_ifr_.*\.html$/i.test(fileName))
     .sort((left, right) => right.localeCompare(left, "en", { numeric: true }));
 
   if (!candidates.length) {
-    throw new Error("No kbxx_classroom_ifr_*.html file found in the project root.");
+    throw new Error(`No kbxx_classroom_ifr_*.html file found in ${SOURCE_DIR}.`);
   }
 
-  return path.resolve(PROJECT_ROOT, candidates[0]);
+  return path.resolve(SOURCE_DIR, candidates[0]);
 }
 
 function printUsage() {
@@ -32,9 +33,9 @@ if (cliArg === "--help" || cliArg === "-h") {
   process.exit(0);
 }
 
-/* With no argument, use the latest matching HTML file in the project root. */
+/* With no argument, use the latest matching HTML file in the source directory. */
 const SOURCE_FILE = cliArg
-  ? path.resolve(process.cwd(), cliArg)
+  ? path.resolve(SOURCE_DIR, cliArg)
   : findLatestSourceFile();
 
 /* When a page is saved via "View Source" in Chrome/Edge, the actual HTML is */

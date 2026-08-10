@@ -22,6 +22,7 @@ coverage/
 .vite/
 tmp/
 temp/
+.source-data/
 
 # Editor settings
 .vscode/

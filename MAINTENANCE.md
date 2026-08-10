@@ -1,6 +1,6 @@
 # 课室查询系统维护备忘录
 
-更新时间：2026-08-02
+更新时间：2026-08-10
 
 ## 1. 项目概览
 
@@ -14,6 +14,8 @@ public/data/setting.json
 ```
 
 不需要后端服务，也不需要鉴权。
+
+`public/data/v2/` 包含公共字典、教室、占用索引、规范化课程事件和目录索引，供前端后续分阶段迁移使用。
 
 ## 2. 常用命令
 
@@ -43,9 +45,9 @@ npm run preview
 
 ## 3. 更新课表数据
 
-### 自动选择根目录课表文件
+### 自动选择课表文件
 
-将新的教务系统课表文件放到项目根目录，文件名保持类似格式：
+将新的教务系统课表文件放到已忽略的 `.source-data/` 目录，文件名保持类似格式：
 
 ```text
 kbxx_classroom_ifr_2026-2027-1.html
@@ -57,7 +59,13 @@ kbxx_classroom_ifr_2026-2027-1.html
 npm run parse
 ```
 
-解析器会自动查找根目录中名称匹配以下格式的文件：
+PowerShell 中先设置：
+
+```powershell
+$env:SCHEDULE_SOURCE_DIR = ".source-data"
+```
+
+解析器会自动查找该目录中名称匹配以下格式的文件：
 
 ```text
 kbxx_classroom_ifr_*.html
@@ -88,8 +96,16 @@ npm run update-data
 该命令会依次执行：
 
 1. 解析 HTML 课表。
-2. 生成 `public/data/classroom-data.json`。
+2. 生成旧版兼容数据和 `public/data/v2/` 模块化数据。
 3. 执行 `npm run build`。
+
+生成后执行：
+
+```bash
+npm run verify-data-v2
+```
+
+该校验会比对全部 756 个周次、星期和节次占用结果，并验证目录索引与 manifest。
 
 解析成功后会输出教室数量、课程记录数量和最大周次。
 
@@ -135,8 +151,12 @@ npm run build
 | `src/styles.css` | 全部页面样式、响应式布局和深色模式 |
 | `src/main.jsx` | React 应用入口 |
 | `public/data/classroom-data.json` | 前端实际读取的课室数据 |
+| `public/data/v2/` | 模块化数据产物 |
 | `public/data/setting.json` | 网站行为配置 |
 | `scripts/parse-classrooms.js` | HTML 课表解析器 |
+| `scripts/build-data-v2.js` | v2 规范化数据构建器 |
+| `scripts/verify-data-v2.js` | v2 一致性校验 |
+| `scripts/class-normalization.json` | 班级别名和拆分配置 |
 | `package.json` | 项目命令和依赖配置 |
 | `dist/` | 生产构建输出目录 |
 
@@ -237,9 +257,10 @@ npm run update-data
 以后更新课表时只需要：
 
 ```text
-1. 将新的 kbxx_classroom_ifr_*.html 放到项目根目录。
+1. 将新的 kbxx_classroom_ifr_*.html、kbxx_kc_ifr_*.html、kbxx_teacher_ifr_*.html 和 kbxx_xzb_ifr_*.html 放到 `.source-data/`。
 2. 执行 npm run update-data。
-3. 检查解析输出的教室数量和课程数量。
-4. 部署 dist/ 目录。
-5. 浏览器强制刷新并检查当前学期起始日期配置。
+3. 执行 npm run verify-data-v2。
+4. 检查解析输出的教室数量和课程数量。
+5. 部署 dist/ 目录。
+6. 浏览器强制刷新并检查当前学期起始日期配置。
 ```

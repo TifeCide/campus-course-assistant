@@ -70,6 +70,13 @@ npm run parse
 npm run parse-schedule
 ```
 
+生成并校验 v2 模块化数据：
+
+```bash
+npm run build-data-v2
+npm run verify-data-v2
+```
+
 生产构建：
 
 ```bash
@@ -88,7 +95,7 @@ npm run preview
 npm run update-data
 ```
 
-`npm run update-data` 会依次执行 `npm run parse`、`npm run parse-schedule` 和 `npm run build`。推荐在更新课表或准备部署时使用。
+`npm run update-data` 会依次执行 `npm run parse`、`npm run parse-schedule`、`npm run build-data-v2` 和 `npm run build`。推荐在更新课表或准备部署时使用。
 
 ## 项目结构
 
@@ -99,10 +106,14 @@ npm run update-data
 │  └─ data/
 │     ├─ classroom-data.json            教室、时间段和占用数据
 │     ├─ schedule-index.json            课程、教师和班级索引
-│     └─ setting.json                   网站运行配置
+│     ├─ setting.json                   网站运行配置
+│     └─ v2/                            模块化数据产物
 ├─ scripts/
 │  ├─ parse-classrooms.js               教室课表解析器
 │  └─ parse-schedule.js                 课程、教师和班级索引解析器
+│  ├─ build-data-v2.js                  v2 数据构建器
+│  ├─ verify-data-v2.js                 v2 一致性校验
+│  └─ class-normalization.json          班级别名和拆分规则
 ├─ src/
 │  ├─ App.jsx                           页面组件和主要业务逻辑
 │  ├─ main.jsx                          React 应用入口
@@ -115,7 +126,7 @@ npm run update-data
 └─ README.md                            项目说明
 ```
 
-根目录中的以下 HTML 文件是解析器的输入，不是浏览器运行时直接读取的数据：
+以下 HTML 文件是解析器的输入，不是浏览器运行时直接读取的数据。推荐放入已忽略的 `.source-data/` 目录；不设置环境变量时，仍兼容从项目根目录读取：
 
 ```text
 kbxx_classroom_ifr_*.html   教室课表
@@ -128,7 +139,7 @@ kbxx_xzb_ifr_*.html          行政班课表
 
 ### 1. 放置原始课表
 
-将新的教室课表 HTML 文件放到项目根目录，文件名保持以下格式：
+将新的教室课表 HTML 文件放到 `.source-data/`，文件名保持以下格式：
 
 ```text
 kbxx_classroom_ifr_2026-2027-1.html
@@ -138,6 +149,12 @@ kbxx_classroom_ifr_2026-2027-1.html
 
 ```text
 kbxx_classroom_ifr_*.html
+```
+
+PowerShell 中先指定课表目录：
+
+```powershell
+$env:SCHEDULE_SOURCE_DIR = ".source-data"
 ```
 
 不带参数运行时，`parse-classrooms.js` 会按文件名排序并自动选择最新教室课表：
@@ -175,7 +192,7 @@ public/data/classroom-data.json
 
 ### 3. 生成课程索引
 
-将课程、教师和行政班课表放在项目根目录：
+将课程、教师和行政班课表放在同一个课表目录：
 
 ```text
 kbxx_kc_ifr_*.html
@@ -203,7 +220,7 @@ public/data/schedule-index.json
 npm run update-data
 ```
 
-执行后会同时更新 `classroom-data.json`、`schedule-index.json` 并生成生产构建。
+执行后会同时更新 `classroom-data.json`、`schedule-index.json`、`public/data/v2/` 并生成生产构建。
 
 ### 5. 构建并检查
 
@@ -219,8 +236,15 @@ npm run update-data
 - `summary.totalEntries` 是否合理
 - `summary.maxWeek` 是否合理
 - `public/data/schedule-index.json` 的 `generatedAt`、`sourceFiles` 和 `summary` 是否合理
+- `npm run verify-data-v2` 是否通过
 
-注意：GitHub Actions 的部署流程会运行 `npm run parse-schedule`，但不会运行 `npm run parse`。因此更新教室课表后，必须在本地运行 `npm run parse` 并提交生成后的 `public/data/classroom-data.json`；课程、教师和班级索引会在部署时重新生成。
+GitHub Actions 只构建已提交的数据，不再解析原始 HTML。因此更新课表后，必须在本地运行 `npm run update-data`，并提交生成后的数据文件。
+
+### v2 模块化数据
+
+`public/data/v2/` 当前与旧数据并行生成，便于前端分阶段迁移。`availability.json` 只保存每周、星期和节次下的占用 `roomId`；`schedule.json` 使用数值 ID，不保存中文文本；课程、教师和班级搜索通过 `directory.json` 的倒排索引定位事件。
+
+组合班名称会按后缀展开，例如 `财务管理25AB班` 会生成 `财务管理25A班` 和 `财务管理25B班` 两个实体，原始组合文本仍保存在公共字典中。无法自动处理的别名或拆分规则写入 `scripts/class-normalization.json`。
 
 ## 网站配置
 
@@ -358,15 +382,14 @@ dist/
 2. 使用 Node.js 20。
 3. 执行 `npm ci`。
 4. 设置 UTC 构建时间并注入页面。
-5. 执行 `npm run parse-schedule`。
-6. 执行 `npm run build`。
-7. 发布 `dist/` 到 GitHub Pages。
+5. 执行 `npm run build`。
+6. 发布 `dist/` 到 GitHub Pages。
 
 部署前需要确认：
 
 - `public/data/classroom-data.json` 已经是最新版本。
 - `public/data/setting.json` 已经包含当前学期配置。
-- `public/data/schedule-index.json` 可以由部署流程重新生成；本地预览前建议先运行 `npm run parse-schedule`。
+- `public/data/schedule-index.json` 和 `public/data/v2/` 已通过本地数据更新流程生成。
 - GitHub 仓库的 Pages 发布源配置为 GitHub Actions。
 - 如果使用自定义域名，`CNAME` 内容和域名 DNS 配置正确。
 
@@ -430,7 +453,7 @@ npm run parse
 
 ### 解析器提示找不到课表
 
-确认根目录存在匹配以下格式的文件：
+确认 `SCHEDULE_SOURCE_DIR` 指向的目录，或兼容模式下的项目根目录，存在匹配以下格式的文件：
 
 ```text
 kbxx_classroom_ifr_*.html
@@ -464,12 +487,12 @@ data/setting.json
 更新一个新学期的课表时：
 
 ```text
-1. 将新的 `kbxx_classroom_ifr_*.html`、`kbxx_kc_ifr_*.html`、`kbxx_teacher_ifr_*.html` 和 `kbxx_xzb_ifr_*.html` 放到项目根目录。
+1. 将新的 `kbxx_classroom_ifr_*.html`、`kbxx_kc_ifr_*.html`、`kbxx_teacher_ifr_*.html` 和 `kbxx_xzb_ifr_*.html` 放到 `.source-data/`。
 2. 修改 public/data/setting.json 中的 semesterStartDate 和 semesterEndDate。
 3. 执行 npm run update-data。
-4. 检查两个 JSON 文件的解析输出、generatedAt、sourceFile/sourceFiles 和 summary。
+4. 执行 npm run verify-data-v2，并检查解析输出、generatedAt、sourceFile/sourceFiles 和 summary。
 5. 执行 npm run build，确认构建通过。
-6. 提交源课表、生成后的 `classroom-data.json`、配置和代码变更。
+6. 提交生成后的数据、配置和代码变更；原始课表不应提交到主仓库。
 7. 推送到 main，等待 GitHub Pages 工作流完成。
 ```
 

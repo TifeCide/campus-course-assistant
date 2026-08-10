@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "..");
+const SOURCE_DIR = path.resolve(process.env.SCHEDULE_SOURCE_DIR || PROJECT_ROOT);
 const OUTPUT_FILE = path.resolve(PROJECT_ROOT, "public", "data", "schedule-index.json");
 
 const PERIOD_CODES = ["0102", "0304", "0506", "0708", "0910", "1112"];
@@ -25,11 +26,11 @@ const SOURCES = {
 
 function findLatestSource(pattern) {
   const candidates = fs
-    .readdirSync(PROJECT_ROOT)
+    .readdirSync(SOURCE_DIR)
     .filter((fileName) => pattern.test(fileName))
     .sort((left, right) => right.localeCompare(left, "en", { numeric: true }));
 
-  return candidates[0] ? path.resolve(PROJECT_ROOT, candidates[0]) : null;
+  return candidates[0] ? path.resolve(SOURCE_DIR, candidates[0]) : null;
 }
 
 function decodeEntities(input) {
