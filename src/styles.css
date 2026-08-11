@@ -119,8 +119,12 @@ input {
 
 .brand {
   gap: 11px;
+  padding: 0;
   color: inherit;
+  border: 0;
+  background: transparent;
   text-decoration: none;
+  text-align: left;
 }
 
 .brand-mark {
@@ -1266,23 +1270,25 @@ input {
 
 .entity-filter-field {
   min-width: 160px;
-  display: grid;
-  gap: 5px;
+}
+
+.entity-filter-field .field-label {
   color: var(--muted-foreground);
   font-size: 10px;
   font-weight: 600;
 }
 
-.entity-filter-field select {
+.entity-filter-field .multi-select-trigger {
   min-width: 160px;
-  height: 34px;
-  padding: 0 9px;
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: white;
-  font: inherit;
+}
+
+.entity-filter-field .multi-select-trigger > span,
+.entity-filter-field .multi-select-option {
   font-size: 11px;
+}
+
+.entity-filter-field .multi-select-menu {
+  min-width: 160px;
 }
 
 .schedule-entity-link {
@@ -1504,6 +1510,146 @@ input {
   background: #fff0d9;
 }
 
+.schedule-course-preview {
+  position: relative;
+  cursor: pointer;
+  transition: box-shadow 160ms ease;
+}
+
+.schedule-course-preview:hover {
+  box-shadow: 0 0 0 1px rgb(180 83 9 / 18%);
+}
+
+.schedule-course-preview-target {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.schedule-course-preview > :not(.schedule-course-preview-target) {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.schedule-course-preview .schedule-entity-link,
+.schedule-course-preview .schedule-more {
+  pointer-events: auto;
+}
+
+.schedule-course-preview-target:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.schedule-preview-popover {
+  position: fixed;
+  z-index: 45;
+  padding: 12px;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow-lg);
+  animation: dialog-fade-in 140ms ease both;
+}
+
+.schedule-preview-popover.is-above {
+  transform: translateY(-100%);
+}
+
+.schedule-preview-header,
+.schedule-preview-line {
+  display: flex;
+  align-items: center;
+}
+
+.schedule-preview-header {
+  min-width: 0;
+  gap: 10px;
+}
+
+.schedule-preview-line {
+  min-width: 0;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.schedule-preview-label {
+  flex: 0 0 28px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.schedule-preview-course,
+.schedule-preview-value {
+  min-width: 0;
+  min-width: 0;
+  padding: 0;
+  color: var(--foreground);
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.schedule-preview-course {
+  overflow: hidden;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-preview-value {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-preview-course:hover,
+.schedule-preview-value:hover {
+  color: var(--primary);
+}
+
+.schedule-preview-close {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+}
+
+.schedule-preview-class-line {
+  align-items: flex-start;
+}
+
+.schedule-preview-class-list {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+}
+
+.schedule-preview-class-list .schedule-preview-value {
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+}
+
+.schedule-preview-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .schedule-course strong,
 .schedule-course span,
 .schedule-course small,
@@ -1538,7 +1684,8 @@ input {
 .schedule-course .schedule-entity-link:first-child {
   margin-top: 0;
   color: #b45309;
-  font-size: 10px;
+  font-size: 9px;
+  font-weight: 600;
 }
 
 .schedule-room-link {
@@ -1859,6 +2006,21 @@ input {
   to { opacity: 1; }
 }
 
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes dialog-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dialog-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(6px); }
+}
+
 @keyframes sheet-in {
   from { transform: translateX(24px); opacity: 0.7; }
   to { transform: translateX(0); opacity: 1; }
@@ -1990,7 +2152,7 @@ input {
     min-width: 0;
   }
 
-  .entity-filter-field select {
+  .entity-filter-field .multi-select-trigger {
     min-width: 0;
     width: 100%;
   }
@@ -2140,6 +2302,10 @@ input {
   box-shadow: var(--shadow-lg);
 }
 
+.single-select-menu {
+  width: max(100%, 160px);
+}
+
 .multi-select-option {
   width: 100%;
   display: flex;
@@ -2196,7 +2362,7 @@ input {
   width: 100%;
 }
 
-.temporal-picker .select-wrap,
+.temporal-picker .single-select-trigger,
 .temporal-picker .date-input-wrap {
   color: var(--muted);
   border: 1px solid var(--border);
@@ -2205,9 +2371,9 @@ input {
   transition: 160ms ease;
 }
 
-.temporal-picker .select-wrap:hover,
+.temporal-picker .single-select-trigger:hover,
+.temporal-picker .single-select-trigger.is-open,
 .temporal-picker .date-input-wrap:hover,
-.temporal-picker .select-wrap:focus-within,
 .temporal-picker .date-input-wrap:focus-within {
   border-color: #8cb3ed;
   box-shadow: 0 0 0 3px rgb(23 105 224 / 10%);
@@ -2427,7 +2593,7 @@ input {
   border-radius: 6px;
   background: #f8fafc;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.01em;
 }
 
@@ -2523,6 +2689,11 @@ input {
   animation: fade-in 140ms ease both;
 }
 
+.overlay.is-closing {
+  pointer-events: none;
+  animation: fade-out 180ms ease both;
+}
+
 .dialog {
   width: min(1120px, 100%);
   max-height: min(90vh, 980px);
@@ -2531,7 +2702,11 @@ input {
   border-radius: 18px;
   background: var(--background);
   box-shadow: var(--shadow-lg);
-  animation: sheet-in 180ms ease both;
+  animation: dialog-fade-in 180ms ease both;
+}
+
+.dialog.is-closing {
+  animation: dialog-fade-out 180ms ease both;
 }
 
 .dialog-room {
@@ -2630,6 +2805,36 @@ input {
 
 .dialog-header-actions {
   gap: 8px;
+}
+
+.dialog-eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-back-button {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.detail-back-depth {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  padding: 0 3px;
+  color: white;
+  border: 1px solid white;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: var(--shadow-sm);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .dialog-detail-grid {
@@ -2743,22 +2948,16 @@ input {
 }
 
 .entity-week-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  width: min(168px, 100%);
   margin-top: 11px;
-  color: var(--muted);
+}
+
+.entity-week-control .field-label {
   font-size: 11px;
 }
 
-.entity-week-control select {
-  min-height: 30px;
-  padding: 0 8px;
-  color: var(--foreground);
-  border: 1px solid var(--border-strong);
-  border-radius: 7px;
-  background: var(--card);
-  font: inherit;
+.entity-week-control .multi-select-menu {
+  min-width: 168px;
 }
 
 .dialog-summary {
@@ -3230,6 +3429,11 @@ input {
     padding: 14px;
   }
 
+  .dialog-room {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    scroll-padding-bottom: env(safe-area-inset-bottom);
+  }
+
   .dialog-room > .dialog-header {
     top: -14px;
     margin: -14px -14px 18px;
@@ -3253,8 +3457,7 @@ input {
   }
 
   .entity-week-control {
-    display: flex;
-    justify-content: space-between;
+    width: 100%;
   }
 
   .command-columns {

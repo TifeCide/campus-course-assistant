@@ -1008,22 +1008,62 @@ function getUniqueSorted(values) {
 }
 
 /* 创建一个选择字段组件，接受标签、值、选项和图标作为属性，并在值变化时调用回调函数。渲染一个带有标签和下拉选择框的表单字段，如果提供了图标，则在选择框前显示图标： */
-function SelectField({ label, value, onChange, options, icon: Icon }) {
+function SelectField({ label, value, onChange, options, icon: Icon, className = "" }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const selectedOption = options.find((option) => option.value === value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
+
   return (
-    <label className="field">
+    <div className={cn("field", "single-select-field", className)}>
       <span className="field-label">{label}</span>
-      <span className="select-wrap">
-        {Icon ? <Icon size={16} strokeWidth={1.8} /> : null}
-        <select value={value} onChange={(event) => onChange(event.target.value)}>
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="select-chevron" size={15} />
-      </span>
-    </label>
+      <div className="multi-select-root" ref={rootRef}>
+        <button
+          className={cn("multi-select-trigger", "single-select-trigger", open && "is-open")}
+          onClick={() => setOpen((current) => !current)}
+          type="button"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+        >
+          {Icon ? <Icon size={16} strokeWidth={1.8} /> : null}
+          <span title={selectedOption?.label}>{selectedOption?.label}</span>
+          <ChevronDown className="select-chevron" size={15} />
+        </button>
+        {open ? (
+          <div className="multi-select-menu single-select-menu" role="listbox">
+            {options.map((option) => {
+              const selected = option.value === value;
+              return (
+                <button
+                  className={cn("multi-select-option", selected && "is-selected")}
+                  key={option.value}
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                >
+                  <span className="check-box">{selected ? <Check size={13} /> : null}</span>
+                  <span>{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -1453,6 +1493,13 @@ function ScheduleRow({ entry, room, onOpen, onNavigate, view }) {
 
 /* 创建一个模态对话框组件，接受打开状态、打开状态变化回调、类名和子元素作为属性，并在按下 Escape 键时关闭对话框。使用 createPortal 将对话框渲染到 document.body 中 */
 function Modal({ open, onOpenChange, className, children }) {
+  const [visible, setVisible] = useState(open);
+  const lastChildrenRef = useRef(children);
+
+  if (open) {
+    lastChildrenRef.current = children;
+  }
+
   useEffect(() => {
     if (!open) return undefined;
     const handleKeyDown = (event) => {
@@ -1462,15 +1509,36 @@ function Modal({ open, onOpenChange, className, children }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, onOpenChange]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (open) {
+      setVisible(true);
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => setVisible(false), 180);
+    return () => window.clearTimeout(timeout);
+  }, [open]);
+
+  if (!visible) return null;
 
   return createPortal(
-    <div className="overlay" onMouseDown={() => onOpenChange(false)}>
-      <div className={className} onMouseDown={(event) => event.stopPropagation()}>
-        {children}
+    <div className={cn("overlay", !open && "is-closing")} onMouseDown={() => onOpenChange(false)}>
+      <div className={cn(className, !open && "is-closing")} onMouseDown={(event) => event.stopPropagation()}>
+        {open ? children : lastChildrenRef.current}
       </div>
     </div>,
     document.body,
+  );
+}
+
+function DetailBackButton({ canGoBack, depth, onBack }) {
+  if (!canGoBack) return null;
+
+  return (
+    <button className="icon-button detail-back-button" onClick={onBack} type="button" aria-label="返回上一层" title="返回上一层">
+      <ArrowLeft size={18} />
+      {depth > 1 ? <span className="detail-back-depth">{depth}</span> : null}
+    </button>
   );
 }
 
@@ -1497,11 +1565,7 @@ function NotificationSurface({ notification, isMobile, onDismiss }) {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (isMobile) {
-        dismissRef.current();
-      } else {
-        setClosing(true);
-      }
+      setClosing(true);
     }, 7000);
     const countdown = window.setInterval(() => {
       setRemaining((value) => Math.max(0, value - 1));
@@ -1522,11 +1586,7 @@ function NotificationSurface({ notification, isMobile, onDismiss }) {
   function requestDismiss() {
     if (closingRef.current) return;
     closingRef.current = true;
-    if (isMobile) {
-      dismissRef.current();
-    } else {
-      setClosing(true);
-    }
+    setClosing(true);
   }
 
   /* 渲染通知内容，包括图标、标题、文本和剩余时间。如果是移动设备，则显示一个关闭按钮，否则显示一个图标按钮。根据通知类型和关闭状态应用不同的样式类名： */
@@ -1693,19 +1753,24 @@ function RoomDialog({
   onClose,
   onBack,
   canGoBack,
+  backDepth,
   isFavorite,
   onToggleFavorite,
   onNavigate,
+  onPreviewEntry,
   scheduleReady,
   scheduleError,
 }) {
   if (!room) return null;
   if (!scheduleReady) {
     return (
-      <Modal open={Boolean(room)} onOpenChange={onClose} className="dialog dialog-room">
+      <>
         <div className="dialog-header">
           <div>
-            <div className="eyebrow">教室详情</div>
+            <div className="dialog-eyebrow-row">
+              <DetailBackButton canGoBack={canGoBack} depth={backDepth} onBack={onBack} />
+              <div className="eyebrow">教室详情</div>
+            </div>
             <h2>{room.name}</h2>
             <p>
               <MapPin size={14} />
@@ -1713,11 +1778,6 @@ function RoomDialog({
             </p>
           </div>
           <div className="dialog-header-actions">
-            {canGoBack ? (
-              <button className="icon-button" onClick={onBack} type="button" aria-label="返回上一层" title="返回上一层">
-                <ArrowLeft size={18} />
-              </button>
-            ) : null}
             <button className="icon-button dialog-close" onClick={onClose} type="button" aria-label="关闭">
               <X size={19} />
             </button>
@@ -1728,7 +1788,7 @@ function RoomDialog({
           <h3>{scheduleError ? "课表加载失败" : "正在加载完整课表"}</h3>
           <p>{scheduleError || "请稍候"}</p>
         </div>
-      </Modal>
+      </>
     );
   }
   /* 获取教室在当前选定的周次、星期几和节次的占用情况，并根据选定的节次获取对应的时间段信息。然后根据选定的星期几获取对应的星期信息，并将选定的节次标签拼接成字符串。接着获取教室在当前周次的每一天的空闲情况概览，以及教室在当前周次、星期几和节次之后的下一次课程信息： */
@@ -1740,11 +1800,13 @@ function RoomDialog({
   const nextCourse = getNextCourse(room, data, selectedWeek, selectedWeekday, selectedPeriods);
 
   return (
-    
-    <Modal open={Boolean(room)} onOpenChange={onClose} className="dialog dialog-room">
+    <>
       <div className="dialog-header">
         <div>
-          <div className="eyebrow">教室详情</div>
+          <div className="dialog-eyebrow-row">
+            <DetailBackButton canGoBack={canGoBack} depth={backDepth} onBack={onBack} />
+            <div className="eyebrow">教室详情</div>
+          </div>
           <h2>{room.name}</h2>
           <p>
             <MapPin size={14} />
@@ -1752,11 +1814,6 @@ function RoomDialog({
           </p>
         </div>
         <div className="dialog-header-actions">
-          {canGoBack ? (
-            <button className="icon-button" onClick={onBack} type="button" aria-label="返回上一层" title="返回上一层">
-              <ArrowLeft size={18} />
-            </button>
-          ) : null}
           <button
             className={cn("icon-button", "dialog-favorite", isFavorite && "is-favorite")}
             onClick={() => onToggleFavorite(room.name)}
@@ -1870,7 +1927,15 @@ function RoomDialog({
               return (
                 <div className={cn("schedule-cell", entries.length && "is-occupied")} key={`${day.index}-${slot.code}`}>
                   {entries.length ? (
-                    <div className="schedule-course">
+                    <div
+                      className="schedule-course schedule-course-preview"
+                    >
+                      <button
+                        className="schedule-course-preview-target"
+                        onClick={(event) => onPreviewEntry(entries[0], event.currentTarget)}
+                        type="button"
+                        aria-label={`预览${entries[0]?.courseName || "课程"}安排`}
+                      />
                       <ExpandableScheduleEntries
                         entries={entries}
                         collapsedCount={1}
@@ -1900,7 +1965,7 @@ function RoomDialog({
           </div>
         ))}
       </div>
-    </Modal>
+    </>
   );
 }
 
@@ -1994,12 +2059,18 @@ function getEntityScheduleStatus(entries, data, selectedWeek, currentNow, curren
 }
 
 /* 创建一个课程安排单元格组件，显示课程的名称、教师或班级、教室等信息，并提供导航和打开教室的操作。根据当前视图类型（课程或教师）显示相应的信息。接受课程条目、视图类型、教室对象、导航回调函数和打开教室回调函数作为属性： */
-function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom }) {
+function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom, onPreviewEntry }) {
   const primary = view === "courses" ? entry.classGroup : entry.courseName;
   const secondary = view === "teachers" ? entry.classGroup : entry.teacher;
 
   return (
-    <div className="schedule-course entity-schedule-course">
+    <div className="schedule-course entity-schedule-course schedule-course-preview">
+      <button
+        className="schedule-course-preview-target"
+        onClick={(event) => onPreviewEntry(entry, event.currentTarget)}
+        type="button"
+        aria-label={`预览${entry.courseName || "课程"}安排`}
+      />
       {view === "courses" ? (
         <button className="schedule-entity-link" onClick={() => onNavigate("classes", entry.classGroup)} type="button">
           {primary || "未标注班级"}
@@ -2029,6 +2100,92 @@ function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom }) {
   );
 }
 
+function getEntryClassLabels(entry) {
+  const values = entry?.classNames?.length
+    ? entry.classNames
+    : String(entry?.classGroup ?? "").split(/[、,，;；/]+/u);
+  return [...new Set(values.map((value) => String(value).trim()).filter(Boolean))];
+}
+
+function SchedulePreviewPopover({ preview, onClose, onNavigate }) {
+  const popoverRef = useRef(null);
+
+  useEffect(() => {
+    if (!preview) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!popoverRef.current?.contains(event.target)) onClose();
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", onClose);
+    window.addEventListener("scroll", onClose, true);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", onClose);
+      window.removeEventListener("scroll", onClose, true);
+    };
+  }, [onClose, preview]);
+
+  if (!preview) return null;
+
+  const { entry, anchorRect } = preview;
+  const classLabels = getEntryClassLabels(entry);
+  const cardWidth = Math.min(320, window.innerWidth - 24);
+  const left = clamp(anchorRect.left, 12, Math.max(12, window.innerWidth - cardWidth - 12));
+  const showAbove = anchorRect.bottom > window.innerHeight * 0.58;
+  function navigate(view, label) {
+    onClose();
+    onNavigate(view, label);
+  }
+
+  return createPortal(
+    <aside
+      ref={popoverRef}
+      className={cn("schedule-preview-popover", showAbove && "is-above")}
+      style={{ left, top: showAbove ? anchorRect.top - 10 : anchorRect.bottom + 10, width: cardWidth }}
+      role="dialog"
+      aria-label="课程安排预览"
+    >
+      <div className="schedule-preview-header">
+        <span className="schedule-preview-label">课程</span>
+        <button className="schedule-preview-course" onClick={() => navigate("courses", entry.courseName)} type="button">
+          {entry.courseName || "未命名课程"}
+        </button>
+        <button className="icon-button schedule-preview-close" onClick={onClose} type="button" aria-label="关闭预览" title="关闭预览">
+          <X size={15} />
+        </button>
+      </div>
+      <div className="schedule-preview-line">
+        <span className="schedule-preview-label">教师</span>
+        <button className="schedule-preview-value" onClick={() => navigate("teachers", entry.teacher)} type="button">
+          {entry.teacher || "未标注教师"}
+        </button>
+      </div>
+      <div className="schedule-preview-line schedule-preview-class-line">
+        <span className="schedule-preview-label">班级</span>
+        <div className="schedule-preview-class-list">
+          {classLabels.length ? (
+            classLabels.map((classLabel) => (
+              <button className="schedule-preview-value" key={classLabel} onClick={() => navigate("classes", classLabel)} type="button">
+                {classLabel}
+              </button>
+            ))
+          ) : (
+            <span className="schedule-preview-empty">未标注班级</span>
+          )}
+        </div>
+      </div>
+    </aside>,
+    document.body,
+  );
+}
+
 /* 创建一个实体课表对话框组件，显示实体（课程、教师或班级）的课表信息，包括本周安排、关联信息、涉及教室、当前定位和当前状态等。接受实体对象、课表数据、数据、选定的周次、星期几、节次、当前时间、当前学期、最大周次、教室映射对象以及关闭回调函数、周次变化回调函数、筛选变化回调函数、导航回调函数和打开教室回调函数作为属性： */
 function EntityScheduleDialog({
   entity,
@@ -2044,10 +2201,12 @@ function EntityScheduleDialog({
   onClose,
   onBack,
   canGoBack,
+  backDepth,
   onWeekChange,
   onFilterChange,
   onNavigate,
   onOpenRoom,
+  onPreviewEntry,
 }) {
   /* 如果实体对象、课表数据或数据不存在，则返回 null，不渲染任何内容： */
   if (!entity || !scheduleData || !data) return null;
@@ -2087,32 +2246,30 @@ function EntityScheduleDialog({
       ? `${courseCount} 门课程 / ${classCount} 个班级`
       : `${courseCount} 门课程 / ${teacherCount} 位教师`;
   return (
-    <Modal open={Boolean(entity)} onOpenChange={onClose} className="dialog dialog-room dialog-entity">
+    <>
       <div className="dialog-header">
         <div>
-          <div className="eyebrow">{getEntityDialogTitle(entity.view)}</div>
+          <div className="dialog-eyebrow-row">
+            <DetailBackButton canGoBack={canGoBack} depth={backDepth} onBack={onBack} />
+            <div className="eyebrow">{getEntityDialogTitle(entity.view)}</div>
+          </div>
           <h2>{entity.label}</h2>
           <p>
             <CalendarDays size={14} />
             第 {selectedWeek} 周完整安排
           </p>
-          <label className="entity-week-control">
-            <span>查看周次</span>
-            <select value={selectedWeek} onChange={(event) => onWeekChange(Number(event.target.value))}>
-              {Array.from({ length: maxWeek }, (_, index) => (
-                <option value={index + 1} key={index + 1}>
-                  第 {index + 1} 周
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            className="entity-week-control"
+            label="查看周次"
+            value={String(selectedWeek)}
+            onChange={(value) => onWeekChange(Number(value))}
+            options={Array.from({ length: maxWeek }, (_, index) => ({
+              value: String(index + 1),
+              label: `第 ${index + 1} 周`,
+            }))}
+          />
         </div>
         <div className="dialog-header-actions">
-          {canGoBack ? (
-            <button className="icon-button" onClick={onBack} type="button" aria-label="返回上一层" title="返回上一层">
-              <ArrowLeft size={18} />
-            </button>
-          ) : null}
           <button className="icon-button dialog-close" onClick={onClose} type="button" aria-label="关闭">
             <X size={19} />
           </button>
@@ -2164,31 +2321,40 @@ function EntityScheduleDialog({
       <div className="entity-filter-row">
         <div className="filter-title"><Filter size={15} /> 课表筛选</div>
         {entity.view !== "courses" ? (
-          <label className="entity-filter-field">
-            <span>课程</span>
-            <select value={entity.courseFilter || ""} onChange={(event) => onFilterChange("courseFilter", event.target.value)}>
-              <option value="">全部课程</option>
-              {relatedCourses.map((item) => <option value={item} key={item}>{item}</option>)}
-            </select>
-          </label>
+          <SelectField
+            className="entity-filter-field"
+            label="课程"
+            value={entity.courseFilter || ""}
+            onChange={(value) => onFilterChange("courseFilter", value)}
+            options={[
+              { value: "", label: "全部课程" },
+              ...relatedCourses.map((item) => ({ value: item, label: item })),
+            ]}
+          />
         ) : null}
         {entity.view !== "teachers" ? (
-          <label className="entity-filter-field">
-            <span>教师</span>
-            <select value={entity.teacherFilter || ""} onChange={(event) => onFilterChange("teacherFilter", event.target.value)}>
-              <option value="">全部教师</option>
-              {relatedTeachers.map((item) => <option value={item} key={item}>{item}</option>)}
-            </select>
-          </label>
+          <SelectField
+            className="entity-filter-field"
+            label="教师"
+            value={entity.teacherFilter || ""}
+            onChange={(value) => onFilterChange("teacherFilter", value)}
+            options={[
+              { value: "", label: "全部教师" },
+              ...relatedTeachers.map((item) => ({ value: item, label: item })),
+            ]}
+          />
         ) : null}
         {entity.view !== "classes" ? (
-          <label className="entity-filter-field">
-            <span>班级</span>
-            <select value={entity.classFilter || ""} onChange={(event) => onFilterChange("classFilter", event.target.value)}>
-              <option value="">全部班级</option>
-              {relatedClasses.map((item) => <option value={item} key={item}>{item}</option>)}
-            </select>
-          </label>
+          <SelectField
+            className="entity-filter-field"
+            label="班级"
+            value={entity.classFilter || ""}
+            onChange={(value) => onFilterChange("classFilter", value)}
+            options={[
+              { value: "", label: "全部班级" },
+              ...relatedClasses.map((item) => ({ value: item, label: item })),
+            ]}
+          />
         ) : null}
       </div>
 
@@ -2224,6 +2390,7 @@ function EntityScheduleDialog({
                           room={roomByName.get(entry.roomName)}
                           onNavigate={onNavigate}
                           onOpenRoom={onOpenRoom}
+                          onPreviewEntry={onPreviewEntry}
                         />
                       )}
                     />
@@ -2236,7 +2403,7 @@ function EntityScheduleDialog({
           </div>
         ))}
       </div>
-    </Modal>
+    </>
   );
 }
 
@@ -2466,6 +2633,7 @@ function App() {
   const [selectedZones, setSelectedZones] = useState([]);
   const [query, setQuery] = useState("");
   const [detailStack, setDetailStack] = useState([]);
+  const [schedulePreview, setSchedulePreview] = useState(null);
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
@@ -3180,11 +3348,13 @@ function App() {
 
   function goBackDetail() {
     if (detailStackRef.current.length <= 1) return;
+    closeSchedulePreview();
     window.history.back();
   }
 
   function closeCurrentDetail() {
     if (!detailStackRef.current.length) return;
+    closeSchedulePreview();
     const stateDepth = Number(window.history.state?.detailDepth) || 0;
     if (detailStackRef.current.length > 1 && stateDepth === detailStackRef.current.length) {
       window.history.back();
@@ -3197,13 +3367,27 @@ function App() {
 
   function clearDetails() {
     if (!detailStackRef.current.length) return;
+    closeSchedulePreview();
     const nextStack = commitDetailStack([]);
     replaceDetailHistoryState(nextStack);
+  }
+
+  function closeSchedulePreview() {
+    setSchedulePreview(null);
+  }
+
+  function previewScheduleEntry(entry, anchorElement) {
+    if (!entry || !anchorElement) return;
+    setSchedulePreview({
+      entry,
+      anchorRect: anchorElement.getBoundingClientRect(),
+    });
   }
 
   /* 打开教室的函数 */
   function openRoom(room) {
     if (!room?.name) return;
+    closeSchedulePreview();
     pushDetail({ type: "room", name: room.name });
     setCommandOpen(false);
     void ensureSchedule();
@@ -3217,6 +3401,7 @@ function App() {
   /* 导航到实体的函数 */
   function navigateToEntity(view, label) {
     if (!label) return;
+    closeSchedulePreview();
     const nextView = normalizeView(view);
     pushDetail({ type: "entity", view: nextView, label });
     setCommandOpen(false);
@@ -3239,6 +3424,14 @@ function App() {
   /* 从实体打开教室的函数 */
   function openRoomFromEntity(room) {
     openRoom(room);
+  }
+
+  function handleBrandClick(event) {
+    event.preventDefault();
+    closeSchedulePreview();
+    resetAllFilters();
+    setFiltersVisible(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
   /*如果加载数据时发生错误，则显示一个加载失败的界面，提示用户数据加载失败，并提供重新加载按钮和联系开发者的链接： */
   if (loadError) {
@@ -3264,7 +3457,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-            <a className="brand" href={import.meta.env.BASE_URL}>
+            <button className="brand" onClick={handleBrandClick} type="button" aria-label="返回首页并重置筛选">
           <div className="brand-mark">
             <BrandMarkIcon />
           </div>
@@ -3272,7 +3465,7 @@ function App() {
             <strong>校园课程助手</strong>
             <span>ZSC</span>
           </div>
-        </a>
+        </button>
         <div className="topbar-actions">
           {settings.enableCommandPalette ? (
             <button className="button button-outline topbar-command" onClick={() => setCommandOpen(true)} type="button">
@@ -3681,52 +3874,67 @@ function App() {
         </div>
       </footer>
 
-      <RoomDialog
-        room={selectedRoom ? roomByName.get(selectedRoom.name) ?? selectedRoom : null}
-        data={data}
-        selectedWeek={selectedWeek}
-        selectedWeekday={selectedWeekday}
-        selectedPeriods={selectedPeriods}
-        onClose={closeCurrentDetail}
-        onBack={goBackDetail}
-        canGoBack={canNavigateDetailBack}
-        isFavorite={selectedRoom ? favoriteSet.has(selectedRoom.name) : false}
-        onToggleFavorite={toggleFavorite}
-        onNavigate={navigateToEntity}
-        scheduleReady={Boolean(scheduleData)}
-        scheduleError={lazyLoadError}
-      />
+      <Modal open={Boolean(selectedRoom || (selectedEntity && scheduleData))} onOpenChange={closeCurrentDetail} className={cn("dialog", currentDetail?.type === "entity" ? "dialog-room dialog-entity" : "dialog-room")}>
+        {selectedRoom ? (
+          <RoomDialog
+            room={roomByName.get(selectedRoom.name) ?? selectedRoom}
+            data={data}
+            selectedWeek={selectedWeek}
+            selectedWeekday={selectedWeekday}
+            selectedPeriods={selectedPeriods}
+            onClose={closeCurrentDetail}
+            onBack={goBackDetail}
+            canGoBack={canNavigateDetailBack}
+            backDepth={Math.max(0, detailStack.length - 1)}
+            isFavorite={favoriteSet.has(selectedRoom.name)}
+            onToggleFavorite={toggleFavorite}
+            onNavigate={navigateToEntity}
+            onPreviewEntry={previewScheduleEntry}
+            scheduleReady={Boolean(scheduleData)}
+            scheduleError={lazyLoadError}
+          />
+        ) : null}
+        {selectedEntity ? (
+          <EntityScheduleDialog
+            entity={selectedEntity}
+            scheduleData={scheduleData}
+            data={data}
+            selectedWeek={selectedWeek}
+            selectedWeekday={selectedWeekday}
+            selectedPeriods={selectedPeriods}
+            currentNow={currentNow}
+            currentTemporal={currentTemporal}
+            maxWeek={data.summary.maxWeek}
+            roomByName={roomByName}
+            onClose={closeCurrentDetail}
+            onBack={goBackDetail}
+            canGoBack={canNavigateDetailBack}
+            backDepth={Math.max(0, detailStack.length - 1)}
+            onWeekChange={(week) => {
+              setSelectedWeek(clamp(week, 1, data.summary.maxWeek));
+              setTemporalMode("week");
+            }}
+            onFilterChange={(key, value) => {
+              commitDetailStack(
+                detailStackRef.current.map((item, index) =>
+                  index === detailStackRef.current.length - 1 && item.type === "entity"
+                    ? { ...item, [key]: value }
+                    : item,
+                ),
+              );
+              replaceDetailHistoryState();
+            }}
+            onNavigate={navigateToEntity}
+            onOpenRoom={openRoomFromEntity}
+            onPreviewEntry={previewScheduleEntry}
+          />
+        ) : null}
+      </Modal>
 
-      <EntityScheduleDialog
-        entity={selectedEntity}
-        scheduleData={scheduleData}
-        data={data}
-        selectedWeek={selectedWeek}
-        selectedWeekday={selectedWeekday}
-        selectedPeriods={selectedPeriods}
-        currentNow={currentNow}
-        currentTemporal={currentTemporal}
-        maxWeek={data.summary.maxWeek}
-        roomByName={roomByName}
-        onClose={closeCurrentDetail}
-        onBack={goBackDetail}
-        canGoBack={canNavigateDetailBack}
-        onWeekChange={(week) => {
-          setSelectedWeek(clamp(week, 1, data.summary.maxWeek));
-          setTemporalMode("week");
-        }}
-        onFilterChange={(key, value) => {
-          commitDetailStack(
-            detailStackRef.current.map((item, index) =>
-              index === detailStackRef.current.length - 1 && item.type === "entity"
-                ? { ...item, [key]: value }
-                : item,
-            ),
-          );
-          replaceDetailHistoryState();
-        }}
+      <SchedulePreviewPopover
+        preview={schedulePreview}
+        onClose={closeSchedulePreview}
         onNavigate={navigateToEntity}
-        onOpenRoom={openRoomFromEntity}
       />
 
       <NotificationCenterDialog

@@ -1,14 +1,14 @@
 {
   "semesterStartDate": "2026-08-31",
-  "semesterEndDate": "2026-12-20",
+  "semesterEndDate": "2027-01-03",
   "notify": [
     {
         "notifyNo": 0,
         "notifyType": "info",
         "notifyTitle": "非教学周提醒",
         "notifyText": "现在不是教学周，请手动选择日期。",
-        "notifyStartDate": "2026-08-30",
-        "notifyEndDate": "2026-12-20",
+        "notifyStartDate": "2026-08-31",
+        "notifyEndDate": "2027-01-03",
         "notifyInDate": 0,
         "notifyTwice": true
       },
@@ -16,7 +16,7 @@
         "notifyNo": 1,
         "notifyType": "warning",
         "notifyTitle": "使用须知",
-        "notifyText": "当前教室占用信息根据教务系统课程安排整理生成，并非实时占用状态。\n由于临时调课、考试安排、活动申请等情况可能未同步，查询结果仅供参考，实际使用前建议现场确认。",
+        "notifyText": "当前教室占用信息根据教务系统课程安排整理生成，并非实时占用状态。\n 由于临时调课、考试安排、活动申请等情况可能未同步，查询结果仅供参考，实际使用前建议现场确认。",
         "notifyStartDate": "1970-01-01",
         "notifyEndDate": "1970-01-01",
         "notifyInDate": 0,
