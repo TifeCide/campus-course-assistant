@@ -1491,6 +1491,49 @@ function ScheduleRow({ entry, room, onOpen, onNavigate, view }) {
   return <div className={cn("course-row", !canOpenRoom && "schedule-row-disabled")}>{content}</div>;
 }
 
+let modalScrollLockCount = 0;
+let modalScrollLockState = null;
+
+function lockPageScroll() {
+  const body = document.body;
+
+  if (modalScrollLockCount === 0) {
+    const scrollY = window.scrollY;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    modalScrollLockState = {
+      scrollY,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+      paddingRight: body.style.paddingRight,
+    };
+
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) body.style.paddingRight = `${scrollbarWidth}px`;
+  }
+
+  modalScrollLockCount += 1;
+
+  return () => {
+    modalScrollLockCount = Math.max(0, modalScrollLockCount - 1);
+    if (modalScrollLockCount !== 0 || !modalScrollLockState) return;
+
+    const { scrollY, ...styles } = modalScrollLockState;
+    Object.assign(body.style, styles);
+    modalScrollLockState = null;
+    window.scrollTo(0, scrollY);
+  };
+}
+
 /* 创建一个模态对话框组件，接受打开状态、打开状态变化回调、类名和子元素作为属性，并在按下 Escape 键时关闭对话框。使用 createPortal 将对话框渲染到 document.body 中 */
 function Modal({ open, onOpenChange, className, children }) {
   const [visible, setVisible] = useState(open);
@@ -1518,6 +1561,11 @@ function Modal({ open, onOpenChange, className, children }) {
     const timeout = window.setTimeout(() => setVisible(false), 180);
     return () => window.clearTimeout(timeout);
   }, [open]);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    return lockPageScroll();
+  }, [visible]);
 
   if (!visible) return null;
 
@@ -1948,9 +1996,7 @@ function RoomDialog({
                               {entry.teacher || "未标注教师"}
                             </button>
                             {entry.classGroup ? (
-                              <button className="schedule-entity-link" onClick={() => onNavigate("classes", entry.classGroup)} type="button">
-                                {entry.classGroup}
-                              </button>
+                              <ScheduleClassGroup classGroup={entry.classGroup} onNavigate={onNavigate} />
                             ) : null}
                           </div>
                         )}
@@ -1990,6 +2036,25 @@ function ExpandableScheduleEntries({ entries, collapsedCount = 2, renderEntry })
         </button>
       ) : null}
     </div>
+  );
+}
+
+function getClassGroupSummary(classGroup) {
+  const separatorCount = (String(classGroup ?? "").match(/、/g) ?? []).length;
+  return separatorCount >= 2 ? `共${separatorCount + 1}个班级` : "";
+}
+
+function ScheduleClassGroup({ classGroup, onNavigate }) {
+  const summary = getClassGroupSummary(classGroup);
+
+  if (summary) {
+    return <span className="schedule-class-group-summary">{summary}</span>;
+  }
+
+  return (
+    <button className="schedule-entity-link" onClick={() => onNavigate("classes", classGroup)} type="button">
+      {classGroup || "未标注班级"}
+    </button>
   );
 }
 
@@ -2072,9 +2137,7 @@ function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom, onPrevi
         aria-label={`预览${entry.courseName || "课程"}安排`}
       />
       {view === "courses" ? (
-        <button className="schedule-entity-link" onClick={() => onNavigate("classes", entry.classGroup)} type="button">
-          {primary || "未标注班级"}
-        </button>
+        <ScheduleClassGroup classGroup={primary} onNavigate={onNavigate} />
       ) : (
         <button className="schedule-entity-link" onClick={() => onNavigate("courses", entry.courseName)} type="button">
           {primary || "未命名课程"}
@@ -2084,11 +2147,7 @@ function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom, onPrevi
         <button className="schedule-entity-link" onClick={() => onNavigate("teachers", entry.teacher)} type="button">
           {secondary || "未标注教师"}
         </button>
-      ) : (
-        <button className="schedule-entity-link" onClick={() => onNavigate("classes", entry.classGroup)} type="button">
-          {secondary || "未标注班级"}
-        </button>
-      )}
+      ) : <ScheduleClassGroup classGroup={secondary} onNavigate={onNavigate} />}
       {room ? (
         <button className="schedule-entity-link schedule-room-link" onClick={() => onOpenRoom(room)} type="button">
           {entry.roomName}
