@@ -36,3 +36,6 @@ Thumbs.db
 Desktop.ini
 
 .claude/settings.local.json
+
+# data
+kbxx_*.html
