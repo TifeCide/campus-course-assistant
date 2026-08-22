@@ -155,7 +155,7 @@ npm run build
 | `src/components/` | 可复用 UI 组件（ui、pickers、cards、room-dialog、entity-schedule、notifications 等） |
 | `src/hooks/` | useClock、useFavorites、useRecentQueries 状态钩子 |
 | `src/utils/` | 时间日期、教室占用、查询快照、v2 数据转换、通知归一化等纯函数 |
-| `src/styles.css` | 全部页面样式、响应式布局和深色模式 |
+| `src/styles/tokens.css` | Tailwind v4 主题令牌（色阶/阴影/动效）、基础样式与 .btn/.card 等组件类 |
 | `src/main.jsx` | React 应用入口 |
 | `public/data/v2/` | 前端实际读取的模块化数据 |
 | `public/data/setting.json` | 网站行为配置 |

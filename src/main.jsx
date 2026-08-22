@@ -3,7 +3,7 @@ import React from "react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App, { AppErrorBoundary } from "./App";
-import "./styles.css";
+import "./styles/tokens.css";
 
 /*将应用程序渲染到 HTML 中 id 为 "root" 的元素中 */
 createRoot(document.getElementById("root")).render(

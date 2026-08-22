@@ -9,14 +9,11 @@ import {
   Clock3,
   Database,
   DoorOpen,
-  Eye,
-  EyeOff,
   Filter,
   Github,
   Heart,
   History,
   LayoutGrid,
-  PanelTop,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -92,6 +89,13 @@ import {
   Toggle,
 } from "./components/ui";
 
+const VIEW_TABS = [
+  { view: "available", label: "教室", icon: LayoutGrid },
+  { view: "courses", label: "课程", icon: BookOpen },
+  { view: "teachers", label: "教师", icon: UserRound },
+  { view: "classes", label: "班级", icon: Users },
+];
+
 /*这个是应用程序的主组件. */
 function App() {
   /*这一系列的状态变量用于管理应用程序的各种状态，包括数据、设置、加载进度、视图类型、筛选条件、命令面板等。它们使用 React 的 useState 钩子来创建和更新状态： */
@@ -126,7 +130,7 @@ function App() {
   const [commandQuery, setCommandQuery] = useState("");
   const [favorites, setFavorites] = useFavorites();
   const [recentQueries, saveRecentQuery] = useRecentQueries();
-  const [filtersVisible, setFiltersVisible] = useState(true);
+  const [showBackToFilters, setShowBackToFilters] = useState(false);
   const [urlInitialized, setUrlInitialized] = useState(false);
   const autoInitialized = useRef(false);
   const currentNow = useClock();
@@ -339,8 +343,9 @@ function App() {
   const [showResultsJump, setShowResultsJump] = useState(false);
   const queryPanelRef = useRef(null);
   const resultsSectionRef = useRef(null);
+  const resultsZoneRef = useRef(false);
+  const lastScrollYRef = useRef(0);
 
-  /* 使用 useEffect 钩子在组件挂载时添加滚动事件监听器，计算滚动进度并更新状态变量 scrollProgress 和 showResultsJump。当组件卸载时，移除滚动事件监听器： */
   useEffect(() => {
     const handlePopState = (event) => {
       commitDetailStack(event.state?.detailStack ?? []);
@@ -460,7 +465,7 @@ function App() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [settings.enableCommandPalette]);
 
-  /* 使用 useEffect 钩子在组件挂载时添加滚动和调整大小事件监听器，以便在用户滚动页面或调整窗口大小时更新滚动进度和“跳转到结果”按钮的显示状态。当组件卸载时，移除事件监听器： */
+  /* 使用 useEffect 钩子在组件挂载时添加滚动和调整大小事件监听器，以便在用户滚动页面或调整窗口大小时更新滚动进度、“跳转到结果”与“返回筛选”按钮的显示状态。当组件卸载时，移除事件监听器： */
   useEffect(() => {
     const updateScrollProgress = () => {
       const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
@@ -474,14 +479,26 @@ function App() {
         const queryRect = queryPanel.getBoundingClientRect();
         const resultsRect = resultsSection.getBoundingClientRect();
         setShowResultsJump(
-          filtersVisible
-          && queryRect.top <= window.innerHeight - 72
+          queryRect.top <= window.innerHeight - 72
           && queryRect.bottom >= 72
           && resultsRect.top > window.innerHeight - 40,
         );
       } else {
         setShowResultsJump(false);
       }
+
+      if (resultsSection) {
+        const inDeepZone = resultsSection.getBoundingClientRect().top < 240;
+        const scrollingDown = scrollTop - lastScrollYRef.current > 0;
+        if (inDeepZone && scrollingDown && !resultsZoneRef.current) {
+          setShowBackToFilters(true);
+        }
+        if (!inDeepZone && scrollTop < 300) {
+          setShowBackToFilters(false);
+        }
+        resultsZoneRef.current = inDeepZone;
+      }
+      lastScrollYRef.current = scrollTop;
     };
 
     updateScrollProgress();
@@ -491,7 +508,7 @@ function App() {
       window.removeEventListener("scroll", updateScrollProgress);
       window.removeEventListener("resize", updateScrollProgress);
     };
-  }, [filtersVisible]);
+  }, []);
 
   const filteredRooms = useMemo(() => {
     if (!data) return [];
@@ -811,6 +828,14 @@ function App() {
     replaceDetailHistoryState(nextStack);
   }
 
+  /*平滑滚动返回筛选面板位置： */
+  function scrollBackToFilters() {
+    const panel = queryPanelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - 92), behavior: "smooth" });
+  }
+
   function closeSchedulePreview() {
     setSchedulePreview(null);
   }
@@ -869,19 +894,27 @@ function App() {
     event.preventDefault();
     closeSchedulePreview();
     resetAllFilters();
-    setFiltersVisible(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   /*如果加载数据时发生错误，则显示一个加载失败的界面，提示用户数据加载失败，并提供重新加载按钮和联系开发者的链接： */
   if (loadError) {
     return (
-      <main className="load-state">
-        <div className="load-card">
-          <CircleHelp size={30} />
-          <h1>数据加载失败</h1>
-          <p>{loadError}.<br />如多次出现此问题，请<a href={`https://github.com/${GITHUB_USER}`} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>联系开发者</a>。
+      <main className="grid min-h-dvh place-items-center bg-gray-50 px-4">
+        <div className="w-full max-w-md animate-slide-up rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-lg">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-danger-50 text-danger-600">
+            <CircleHelp size={24} />
+          </div>
+          <h1 className="mt-4 text-lg font-bold tracking-tight text-gray-900">数据加载失败</h1>
+          <p className="mt-2 text-sm leading-relaxed text-gray-500">
+            {loadError}.
+            <br />
+            如多次出现此问题，请
+            <a href={`https://github.com/${GITHUB_USER}`} target="_blank" rel="noopener noreferrer" className="font-medium text-primary-600 underline-offset-2 hover:underline">
+              联系开发者
+            </a>
+            。
           </p>
-          <button className="button button-primary" onClick={() => window.location.reload()} type="button">
+          <button className="btn-primary mt-6" onClick={() => window.location.reload()} type="button">
             重新加载
           </button>
         </div>
@@ -894,68 +927,77 @@ function App() {
   }
   /*如果数据和设置都已加载完成，则渲染应用程序的主界面，包括顶部栏、主内容区域、通知中心、筛选栏等。根据当前的状态变量，显示不同的视图和组件： */
   return (
-    <div className="app-shell">
-      <header className="topbar">
-            <button className="brand" onClick={handleBrandClick} type="button" aria-label="返回首页并重置筛选">
-          <div className="brand-mark">
-            <BrandMarkIcon />
-          </div>
-          <div>
-            <strong>校园课程助手</strong>
-            <span>ZSC</span>
-          </div>
-        </button>
-        <div className="topbar-actions">
-          {settings.enableCommandPalette ? (
-            <button className="button button-outline topbar-command" onClick={() => setCommandOpen(true)} type="button">
-              <Search size={15} />
-              <span>搜索</span>
-              <kbd>{isMac ? "⌘ K" : "Ctrl + K"}</kbd>
-            </button>
-          ) : null}
-          <button
-            className="icon-button notification-center-button"
-            onClick={() => setNotificationCenterOpen(true)}
-            type="button"
-            aria-label="打开通知中心"
-            title="通知中心"
-          >
-            <Bell size={18} />
+    <div className="min-h-dvh bg-gray-50">
+      <header className="fixed inset-x-0 top-0 z-30 border-b border-gray-200/70 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between px-5 sm:px-6 lg:px-[clamp(20px,5vw,72px)]">
+          <button className="flex items-center gap-3 rounded-lg" onClick={handleBrandClick} type="button" aria-label="返回首页并重置筛选">
+            <span className="grid h-[38px] w-[38px] shrink-0 place-items-center overflow-hidden rounded-[11px] bg-primary-600 shadow-[0_7px_17px_rgb(23_105_224/0.28)]">
+              <BrandMarkIcon />
+            </span>
+            <span className="text-left leading-tight">
+              <strong className="block text-[15px] font-semibold tracking-tight text-gray-900">校园课程助手</strong>
+              <span className="block text-[9px] font-bold tracking-[0.16em] text-gray-400">ZSC</span>
+            </span>
           </button>
+          <div className="flex items-center gap-1.5">
+            {settings.enableCommandPalette ? (
+              <button
+                className="inline-flex h-8 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-500 shadow-xs transition-colors hover:border-gray-300 hover:text-gray-700"
+                onClick={() => setCommandOpen(true)}
+                type="button"
+              >
+                <Search size={14} />
+                <span>搜索</span>
+                <kbd className="hidden rounded border border-gray-200 bg-gray-50 px-1.5 py-px text-[10px] font-medium text-gray-400 sm:inline-block">
+                  {isMac ? "⌘ K" : "Ctrl K"}
+                </kbd>
+              </button>
+            ) : null}
+            <button
+              className="icon-btn h-9 w-9"
+              onClick={() => setNotificationCenterOpen(true)}
+              type="button"
+              aria-label="打开通知中心"
+              title="通知中心"
+            >
+              <Bell size={17} />
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="page-content">
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow">
-              <Sparkles size={14} /> 校园课程助手
-            </div>
-            <h1>
+      <main className="mx-auto w-full max-w-[1200px] px-5 pt-[92px] pb-16 sm:px-6 lg:px-[clamp(20px,5vw,72px)]">
+        <section className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div className="hero-copy min-w-0">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary-100 bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700">
+              <Sparkles size={12} />
+              校园课程助手
+            </span>
+            <h1 className="mt-3.5 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               查课程
               <br />
-              <em>看课表</em>，找教室
+              <em className="text-primary-600 not-italic">看课表</em>，找教室
             </h1>
-            <p>课程、教师、班级与教室，一站式查询。</p>
-            <div className="hero-meta" aria-label="更新时间">
-              <div className="hero-meta-item">
-                <Clock3 size={15} />
-                <span>助手更新时间</span>
-                <time dateTime={BUILD_TIME}>{formatDateTime(BUILD_TIME)}</time>
-              </div>
-              <div className="hero-meta-item">
-                <Database size={15} />
-                <span>数据更新时间</span>
-                <time dateTime={data.generatedAt}>{formatDateTime(data.generatedAt)}</time>
-              </div>
+            <p className="mt-2.5 text-[15px] text-gray-500">课程、教师、班级与教室，一站式查询。</p>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-gray-400" aria-label="更新时间">
+              <span className="inline-flex items-center gap-1.5">
+                <Clock3 size={13} />
+                助手更新于
+                <time dateTime={BUILD_TIME} className="tabular-nums">{formatDateTime(BUILD_TIME)}</time>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Database size={13} />
+                数据更新于
+                <time dateTime={data.generatedAt} className="tabular-nums">{formatDateTime(data.generatedAt)}</time>
+              </span>
             </div>
           </div>
-          <div className="hero-note">
-            <span>现在是</span>
-            <strong>
+          <div className="shrink-0 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-xs md:text-right">
+            <span className="block text-[11px] font-medium text-gray-400">现在是</span>
+            <strong className="block text-lg font-semibold tracking-tight text-gray-900">
               {currentPhaseLabel} {currentDay?.shortLabel ?? ""}
             </strong>
-            <span>
+            <span className="block text-xs tabular-nums text-gray-500">
               {currentTime
                 ? `${pad2(currentTime.month)}月${pad2(currentTime.day)}日 ${pad2(currentTime.hour)}:${pad2(currentTime.minute)}`
                 : ""}
@@ -963,123 +1005,117 @@ function App() {
           </div>
         </section>
 
-        <NotificationCenter notifications={notifications} />
+        <div className="mt-5">
+          <NotificationCenter notifications={notifications} />
+        </div>
 
-        {filtersVisible ? (
-          <section ref={queryPanelRef} className={cn("query-panel", settings.stickyFilters && "is-sticky")}>
-          <div className="panel-topline">
-            <div className="view-tabs">
-              <button
-                className={cn("view-tab", activeView === "available" && "is-active")}
-                onClick={() => changeView("available")}
-                type="button"
-              >
-                <LayoutGrid size={16} />
-                教室
-              </button>
-              <button
-                className={cn("view-tab", activeView === "courses" && "is-active")}
-                onClick={() => changeView("courses")}
-                type="button"
-              >
-                <BookOpen size={16} />
-                课程
-              </button>
-              <button
-                className={cn("view-tab", activeView === "teachers" && "is-active")}
-                onClick={() => changeView("teachers")}
-                type="button"
-              >
-                <UserRound size={16} />
-                教师
-              </button>
-              <button
-                className={cn("view-tab", activeView === "classes" && "is-active")}
-                onClick={() => changeView("classes")}
-                type="button"
-              >
-                <Users size={16} />
-                班级
-              </button>
-            </div>
-            <div className="panel-actions">
-              <button
-                className="button button-outline filter-visibility-button"
-                onClick={() => setFiltersVisible(false)}
-                type="button"
-                aria-label="隐藏筛选栏"
-                title="隐藏筛选栏"
-              >
-                <EyeOff size={16} />
-                隐藏筛选
-              </button>
+        <section ref={queryPanelRef} className="mt-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex gap-0.5 rounded-lg bg-gray-100 p-1">
+              {VIEW_TABS.map(({ view, label, icon: Icon }) => (
+                <button
+                  key={view}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all duration-150",
+                    activeView === view ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+                  )}
+                  onClick={() => changeView(view)}
+                  type="button"
+                >
+                  <Icon size={15} />
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className={cn("query-fields", activeView !== "available" && "is-directory-query") }>
+          <div className={cn("mt-4 flex flex-col gap-3 lg:flex-row lg:items-end", activeView !== "available" && "lg:flex-row")}>
             {activeView === "available" ? (
               <>
-                <TemporalPicker
-                  onToday={useToday}
-                  mode={temporalMode}
-                  onModeChange={setTemporalMode}
-                  selectedWeek={selectedWeek}
-                  selectedWeekday={selectedWeekday}
-                  selectedDate={selectedDate}
-                  onWeekChange={(value) => {
-                    setSelectedWeek(value);
-                    setTemporalMode("week");
-                  }}
-                  onWeekdayChange={(value) => {
-                    setSelectedWeekday(value);
-                    setTemporalMode("week");
-                  }}
-                  onDateChange={handleDateChange}
-                  weekdays={data.weekdays}
-                  maxWeek={data.summary.maxWeek}
-                  dateRange={dateRange}
-                />
-                <PeriodPicker
-                  timeSlots={data.timeSlots}
-                  selectedPeriods={selectedPeriods}
-                  selectionMode={periodSelectionMode}
-                  onModeChange={handlePeriodModeChange}
-                  onChange={setSelectedPeriods}
-                />
+                <div className="lg:w-[300px] lg:shrink-0">
+                  <TemporalPicker
+                    onToday={useToday}
+                    mode={temporalMode}
+                    onModeChange={setTemporalMode}
+                    selectedWeek={selectedWeek}
+                    selectedWeekday={selectedWeekday}
+                    selectedDate={selectedDate}
+                    onWeekChange={(value) => {
+                      setSelectedWeek(value);
+                      setTemporalMode("week");
+                    }}
+                    onWeekdayChange={(value) => {
+                      setSelectedWeekday(value);
+                      setTemporalMode("week");
+                    }}
+                    onDateChange={handleDateChange}
+                    weekdays={data.weekdays}
+                    maxWeek={data.summary.maxWeek}
+                    dateRange={dateRange}
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <PeriodPicker
+                    timeSlots={data.timeSlots}
+                    selectedPeriods={selectedPeriods}
+                    selectionMode={periodSelectionMode}
+                    onModeChange={handlePeriodModeChange}
+                    onChange={setSelectedPeriods}
+                  />
+                </div>
+                <label className="block w-full lg:w-[240px] lg:shrink-0">
+                  <span className="mb-1.5 block text-xs font-medium text-gray-500">{getViewSearchLabel(activeView)}</span>
+                  <span className="relative block">
+                    <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="输入教室号或楼栋..."
+                      className="field-input h-9 pr-8 pl-9"
+                    />
+                    {query ? (
+                      <button className="icon-btn absolute top-1/2 right-1.5 h-6 w-6 -translate-y-1/2" onClick={() => setQuery("")} type="button" aria-label="清空搜索">
+                        <X size={13} />
+                      </button>
+                    ) : null}
+                  </span>
+                </label>
               </>
-            ) : null}
-            <label className="search-field">
-              <span className="field-label">{getViewSearchLabel(activeView)}</span>
-              <span className="search-input-wrap">
-                <Search size={17} />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={
-                    activeView === "available"
-                      ? "输入教室号或楼栋..."
-                      : activeView === "courses"
+            ) : (
+              <label className="block w-full">
+                <span className="mb-1.5 block text-xs font-medium text-gray-500">{getViewSearchLabel(activeView)}</span>
+                <span className="relative block">
+                  <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={
+                      activeView === "courses"
                         ? "例如：高等数学、张老师、计算机..."
                         : activeView === "teachers"
                           ? "例如：张老师、王教授..."
                           : "例如：电科23A、26计科AB...(可能需要尝试不同的关键词)"
-                  }
-                />
-                {query ? (
-                  <button className="clear-search" onClick={() => setQuery("")} type="button" aria-label="清空搜索">
-                    <X size={15} />
-                  </button>
-                ) : null}
-              </span>
-            </label>
+                    }
+                    className="field-input h-9 pr-8 pl-9"
+                  />
+                  {query ? (
+                    <button className="icon-btn absolute top-1/2 right-1.5 h-6 w-6 -translate-y-1/2" onClick={() => setQuery("")} type="button" aria-label="清空搜索">
+                      <X size={13} />
+                    </button>
+                  ) : null}
+                </span>
+              </label>
+            )}
           </div>
 
-          <div className="filter-row">
-            <div className="filter-title">
-              <SlidersHorizontal size={15} /> 地点筛选
-            </div>
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 border-t border-gray-100 pt-3.5">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <SlidersHorizontal size={13} className="text-gray-400" />
+              地点筛选
+            </span>
             <MultiSelectField
-              label="楼栋"
+              className="w-40"
+              label=""
               values={selectedBuildings}
               onChange={setSelectedBuildings}
               icon={Building2}
@@ -1087,14 +1123,16 @@ function App() {
               options={buildings.map((building) => ({ value: building, label: building }))}
             />
             <MultiSelectField
-              label="楼层"
+              className="w-36"
+              label=""
               values={selectedFloors}
               onChange={setSelectedFloors}
               placeholder="全部楼层"
               options={floors.map((floor) => ({ value: floor, label: `${floor} 层` }))}
             />
             <MultiSelectField
-              label="区域"
+              className="w-44"
+              label=""
               values={selectedZones}
               onChange={setSelectedZones}
               placeholder="全部区域"
@@ -1104,41 +1142,46 @@ function App() {
               <Toggle checked={onlyAvailable} onChange={setOnlyAvailable} label="仅显示空闲" />
             ) : null}
             {hasFilters ? (
-              <button className="button button-outline reset-button" onClick={resetFilters} type="button">
+              <button className="btn-ghost h-8 px-2.5 text-xs text-gray-500 hover:text-danger-600" onClick={resetFilters} type="button">
                 重置筛选
               </button>
             ) : null}
-          </div>
-          <div className="query-panel-footer">
-            <button className="button button-outline reset-all-button" onClick={resetAllFilters} type="button">
+            <span className="ml-auto hidden sm:block" />
+            <button className="btn-ghost h-7 px-2 text-xs text-gray-400" onClick={resetAllFilters} type="button">
               重置全部筛选规则
             </button>
           </div>
           </section>
-        ) : (
-          <div ref={queryPanelRef} className={cn("filter-collapsed-bar", settings.stickyFilters && "is-sticky")}>
-            <span>
-              <PanelTop size={15} />
-              筛选栏已隐藏
-            </span>
-            <button className="button button-outline" onClick={() => setFiltersVisible(true)} type="button">
-              <Eye size={14} />
-              显示筛选
-            </button>
-          </div>
-        )}
+
+          {showBackToFilters ? (
+            <div className="pointer-events-none fixed inset-x-0 top-[84px] z-20 flex justify-center px-4">
+              <button
+                className="pointer-events-auto flex h-9 animate-slide-down items-center gap-1.5 rounded-full border border-white/60 bg-white/95 pl-3.5 pr-3 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-md transition-colors duration-150 hover:text-primary-700"
+                onClick={scrollBackToFilters}
+                type="button"
+              >
+                <ArrowUp size={13} className="text-primary-600" />
+                返回筛选
+              </button>
+            </div>
+          ) : null}
 
         {favoriteRooms.length ? (
-          <section className="favorite-strip" aria-label="收藏教室">
-            <div className="favorite-strip-title">
-              <Heart size={15} fill="currentColor" />
+          <section className="card mt-4 px-4 py-3.5" aria-label="收藏教室">
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+              <Heart size={13} fill="currentColor" className="text-danger-500" />
               收藏教室
             </div>
-            <div className="favorite-room-list">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {favoriteRooms.map((room) => (
-                <button className="favorite-room-chip" key={room.name} onClick={() => openRoom(room)} type="button">
-                  <span>{room.name}</span>
-                  <small>{room.building} · {room.floor}层</small>
+                <button
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-left transition-all duration-150 hover:border-primary-300 hover:bg-primary-50/60"
+                  key={room.name}
+                  onClick={() => openRoom(room)}
+                  type="button"
+                >
+                  <span className="block text-[13px] font-medium text-gray-800">{room.name}</span>
+                  <small className="block text-[11px] text-gray-400">{room.building} · {room.floor}层</small>
                 </button>
               ))}
             </div>
@@ -1146,15 +1189,15 @@ function App() {
         ) : null}
 
         {recentQueries.length ? (
-          <section className="recent-query-strip" aria-label="最近查看">
-            <div className="recent-query-title">
-              <History size={15} />
+          <section className="card mt-3 px-4 py-3.5" aria-label="最近查看">
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+              <History size={13} className="text-gray-400" />
               最近查看
             </div>
-            <div className="recent-query-list">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {recentQueries.map((snapshot, index) => (
                 <button
-                  className="recent-query-chip"
+                  className="max-w-full truncate rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 transition-colors duration-150 hover:border-gray-300 hover:bg-gray-50"
                   key={`${JSON.stringify(snapshot)}-${index}`}
                   onClick={() => applyRecentQuery(snapshot)}
                   type="button"
@@ -1167,46 +1210,46 @@ function App() {
           </section>
         ) : null}
 
-        <section ref={resultsSectionRef} className={cn("results-section", settings.infoDisplay === 0 && "is-masked")}>
+        <section ref={resultsSectionRef} className="relative mt-5">
           <div className="results-content">
-            <div className="results-heading">
-            <div>
-              <div className="section-kicker">
-                <span className="live-pulse" />
-                {activeView === "available" ? `实时${onlyAvailable ? "可用" : ""}情况` : `${getViewLabel(activeView)}结果`}
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-600">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary-500" />
+                  {activeView === "available" ? `实时${onlyAvailable ? "可用" : ""}情况` : `${getViewLabel(activeView)}结果`}
+                </div>
+                <h2 className="mt-1.5 text-xl font-bold tracking-tight text-gray-900">
+                  {activeView === "available"
+                    ? `${activeDay?.shortLabel} ${activePeriodLabel} 的${onlyAvailable ? "空闲" : "全部"}教室`
+                    : query
+                      ? `“${query}”的检索结果`
+                      : "输入关键词开始检索"}
+                </h2>
+                <p className="mt-1 text-[13px] text-gray-500">
+                  {activeView === "available"
+                    ? `第 ${selectedWeek} 周 · ${activeSlots.length ? `${activeSlots[0].start} - ${activeSlots[activeSlots.length - 1].end}` : ""}`
+                    : query
+                      ? activeView === "courses"
+                        ? "已忽略周次、星期和节次，点击课程卡片查看完整周课表"
+                        : activeView === "teachers"
+                          ? "已忽略周次、星期和节次，点击教师卡片查看完整周课表"
+                          : "已忽略周次、星期和节次，点击班级卡片查看完整周课表"
+                      : activeView === "courses"
+                        ? "搜索课程名称"
+                        : `搜索${activeView === "teachers" ? "教师姓名" : "行政班名称"}`}
+                </p>
               </div>
-              <h2>
-                {activeView === "available"
-                  ? `${activeDay?.shortLabel} ${activePeriodLabel} 的${onlyAvailable ? "空闲" : "全部"}教室`
-                  : query
-                    ? `“${query}”的检索结果`
-                    : "输入关键词开始检索"}
-              </h2>
-              <p>
-                {activeView === "available"
-                  ? `第 ${selectedWeek} 周 · ${activeSlots.length ? `${activeSlots[0].start} - ${activeSlots[activeSlots.length - 1].end}` : ""}`
-                  : query
-                    ? activeView === "courses"
-                      ? "已忽略周次、星期和节次，点击课程卡片查看完整周课表"
-                      : activeView === "teachers"
-                        ? "已忽略周次、星期和节次，点击教师卡片查看完整周课表"
-                        : "已忽略周次、星期和节次，点击班级卡片查看完整周课表"
-                    : activeView === "courses"
-                      ? "搜索课程名称"
-                      : `搜索${activeView === "teachers" ? "教师姓名" : "行政班名称"}`}
-              </p>
-            </div>
-            {activeView === "available" ? (
-              <div className="results-count">
-                <strong>{displayRooms.length}</strong>
-                <span>/ {filteredRooms.length} 间{onlyAvailable ? "空闲" : ""}</span>
-              </div>
-            ) : null}
+              {activeView === "available" ? (
+                <div className="text-right">
+                  <strong className="block text-2xl font-bold tabular-nums tracking-tight text-gray-900">{displayRooms.length}</strong>
+                  <span className="text-xs text-gray-400">/ {filteredRooms.length} 间{onlyAvailable ? "空闲" : ""}</span>
+                </div>
+              ) : null}
             </div>
 
             {activeView === "available" ? (
               <>
-                <div className="stats-grid">
+                <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
                   <StatCard icon={DoorOpen} label={onlyAvailable ? "空闲教室" : "匹配教室"} value={displayRooms.length} detail="当前筛选范围内" tone="green" />
                   <StatCard icon={Building2} label="涉及楼栋" value={new Set(displayRooms.map((room) => room.building)).size} detail={`共 ${buildings.length} 栋`} tone="blue" />
                   <StatCard icon={Clock3} label="当前时段" value={activePeriodLabel} detail={selectedPeriods.length > 1 ? "多节次筛选" : `${activeSlots[0]?.start ?? ""} - ${activeSlots[0]?.end ?? ""}`} tone="orange" />
@@ -1214,27 +1257,25 @@ function App() {
                 </div>
 
                 {roomGroups.length ? (
-                  <div className="building-groups">
+                  <div className="mt-5 space-y-6">
                     {roomGroups.map((buildingGroup) => (
-                      <section className="building-group" key={buildingGroup.building}>
-                        <div className="group-heading">
-                          <div className="group-title">
-                            <span className="building-icon">
-                              <Building2 size={16} />
-                            </span>
-                            <strong>{buildingGroup.building}</strong>
-                            <span>{buildingGroup.total} 间{onlyAvailable ? "空闲" : "匹配"}</span>
-                          </div>
-                          <span className="group-line" />
+                      <section key={buildingGroup.building}>
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+                            <Building2 size={14} />
+                          </span>
+                          <strong className="text-sm font-semibold text-gray-900">{buildingGroup.building}</strong>
+                          <span className="text-xs text-gray-400">{buildingGroup.total} 间{onlyAvailable ? "空闲" : "匹配"}</span>
+                          <span className="h-px min-w-0 flex-1 bg-gray-100" />
                         </div>
 
                         {buildingGroup.floors.map((floorGroup) => (
-                          <div className="floor-group" key={`${buildingGroup.building}-${floorGroup.floor}`}>
-                            <div className="floor-heading">
-                              <span className="floor-chip">{floorGroup.floor} 层</span>
-                              <span>{floorGroup.rooms.length} 间</span>
+                          <div className="mt-3" key={`${buildingGroup.building}-${floorGroup.floor}`}>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">{floorGroup.floor} 层</span>
+                              <span className="text-gray-400">{floorGroup.rooms.length} 间</span>
                             </div>
-                            <div className="room-grid">
+                            <div className="mt-2 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
                               {floorGroup.rooms.map((room) => (
                                 <RoomCard
                                   key={room.name}
@@ -1254,11 +1295,13 @@ function App() {
                     ))}
                   </div>
                 ) : (
-                  <EmptyState hasQuery={hasFilters} onReset={resetFilters} />
+                  <div className="mt-4">
+                    <EmptyState hasQuery={hasFilters} onReset={resetFilters} />
+                  </div>
                 )}
               </>
             ) : (
-              <div className="course-results">
+              <div className="mt-4 space-y-2.5">
                 {visibleEntityCards.length ? (
                   visibleEntityCards.slice(0, settings.searchResultLimit).map(({ label, entries, eventCount }) => (
                     <EntityResultCard
@@ -1274,7 +1317,7 @@ function App() {
                   <DirectoryEmptyState view={activeView} hasQuery={Boolean(query)} onReset={() => setQuery("")} />
                 )}
                 {visibleEntityCards.length > settings.searchResultLimit ? (
-                  <p className="result-limit">
+                  <p className="pt-1 text-center text-xs text-gray-400">
                     结果较多，仅展示前 {settings.searchResultLimit} 条，请继续缩小搜索范围。
                   </p>
                 ) : null}
@@ -1283,11 +1326,11 @@ function App() {
           </div>
 
           {settings.infoDisplay === 0 ? (
-            <div className="results-mask" aria-hidden="true">
-              <div className="results-mask-card">
+            <div className="absolute inset-0 z-10 grid place-items-center rounded-2xl bg-gray-50/85 backdrop-blur-[2px]" aria-hidden="true">
+              <div className="max-w-sm px-6 text-center">
                 <ShieldIcon />
-                <strong>{settings.maskMessage?.title || DEFAULT_MASK_MESSAGE.title}</strong>
-                <span>{settings.maskMessage?.text || DEFAULT_MASK_MESSAGE.text}</span>
+                <strong className="mt-3 block text-base font-semibold text-gray-900">{settings.maskMessage?.title || DEFAULT_MASK_MESSAGE.title}</strong>
+                <span className="mt-1 block text-sm text-gray-500">{settings.maskMessage?.text || DEFAULT_MASK_MESSAGE.text}</span>
               </div>
             </div>
           ) : null}
@@ -1295,25 +1338,25 @@ function App() {
       </main>
 
 
-      <footer className="footer">
-        <div className="footer-row">
+      <footer className="border-t border-gray-200/70">
+        <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-2 px-4 py-6 text-xs text-gray-400 sm:flex-row sm:justify-between sm:px-6">
           <span>数据更新于 {formatDateTime(data.generatedAt)}</span>
-        </div>
 
-        <div className="footer-row">
           <a
-          href="https://github.com/TifeCide" target="_blank" rel="noopener noreferrer" className="footer-link"><
-          Github size={16} />
-          <span>TifeCide</span>
+            href="https://github.com/TifeCide"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-gray-800"
+          >
+            <Github size={14} />
+            <span>TifeCide</span>
           </a>
-        </div>
 
-        <div className="footer-row footer-powered">
           <p>Powered by Cloudflare Pages 51LA</p>
         </div>
       </footer>
 
-      <Modal open={Boolean(selectedRoom || (selectedEntity && scheduleData))} onOpenChange={clearDetails} className="dialog dialog-room">
+      <Modal open={Boolean(selectedRoom || (selectedEntity && scheduleData))} onOpenChange={clearDetails} className="dialog-room max-w-[1180px]">
         {selectedRoom ? (
           <RoomDialog
             room={roomByName.get(selectedRoom.name) ?? selectedRoom}
@@ -1397,32 +1440,36 @@ function App() {
 
       {settings.enableBackToTop ? (
         <button
-          className={cn("back-to-top", scrollProgress > 0.08 && "is-visible")}
+          className={cn(
+            "fixed right-5 bottom-5 z-30 h-11 w-11 rounded-full p-[2px] shadow-lg transition-all duration-200",
+            scrollProgress > 0.02 ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0",
+          )}
           type="button"
           aria-label="回到顶部"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          style={{ "--scroll-progress": `${Math.round(scrollProgress * 100)}%` }}
+          style={{
+            background:
+              "conic-gradient(from 0deg, var(--color-primary-500) calc(var(--scroll-progress) * 1%), var(--color-gray-200) 0)",
+            "--scroll-progress": `${Math.round(scrollProgress * 100)}`,
+          }}
         >
-          <span className="back-to-top-ring" aria-hidden="true">
-            <span className="back-to-top-core">
-              <ArrowUp size={16} className="back-to-top-arrow" />
-            </span>
+          <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-gray-600 transition-colors duration-150 hover:text-primary-600">
+            <ArrowUp size={17} />
           </span>
         </button>
       ) : null}
 
       <button
-        className={cn("back-to-top results-jump", showResultsJump && "is-visible")}
+        className={cn(
+          "fixed right-5 bottom-[4.75rem] z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/70 text-primary-600 shadow-lg backdrop-blur-md transition-all duration-200 hover:bg-white/90",
+          showResultsJump ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0",
+        )}
         type="button"
         aria-label="查看查询结果"
         title="查看查询结果"
         onClick={() => resultsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
       >
-        <span className="back-to-top-ring" aria-hidden="true">
-          <span className="back-to-top-core">
-            <Check size={16} className="results-check" />
-          </span>
-        </span>
+        <Check size={17} />
       </button>
     </div>
   );
@@ -1442,11 +1489,13 @@ export class AppErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <main className="load-state">
-          <div className="load-card">
-            <CircleHelp size={30} />
-            <h1>页面运行异常</h1>
-            <p>{this.state.error.message}</p>
+        <main className="grid min-h-dvh place-items-center bg-gray-50 px-4">
+          <div className="w-full max-w-md animate-slide-up rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-lg">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-danger-50 text-danger-600">
+              <CircleHelp size={24} />
+            </div>
+            <h1 className="mt-4 text-lg font-bold tracking-tight text-gray-900">页面运行异常</h1>
+            <p className="mt-2 break-all text-sm text-gray-500">{this.state.error.message}</p>
           </div>
         </main>
       );

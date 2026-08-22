@@ -85,15 +85,17 @@ export function ScheduleClassGroup({ classGroup, onNavigate }) {
   const summary = getClassGroupSummary(classGroup);
 
   if (summary) {
-    return <span className="schedule-class-group-summary">{summary}</span>;
+    return <span className="text-[11px] font-medium text-gray-400">{summary}</span>;
   }
 
   return (
-    <button className="schedule-entity-link" onClick={() => onNavigate("classes", classGroup)} type="button">
+    <button className="block max-w-full truncate rounded text-left text-[11px] font-medium text-gray-700 transition-colors hover:text-primary-600" onClick={() => onNavigate("classes", classGroup)} type="button">
       {classGroup || "未标注班级"}
     </button>
   );
 }
+
+const SCHEDULE_GRID_COLS = "[grid-template-columns:72px_repeat(7,minmax(0,1fr))]";
 
 /* 创建一个课程安排单元格组件，显示课程的名称、教师或班级、教室等信息，并提供导航和打开教室的操作。根据当前视图类型（课程或教师）显示相应的信息。接受课程条目、视图类型、教室对象、导航回调函数和打开教室回调函数作为属性： */
 function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom, onPreviewEntry }) {
@@ -101,32 +103,36 @@ function EntityScheduleCell({ entry, view, room, onNavigate, onOpenRoom, onPrevi
   const secondary = view === "teachers" ? entry.classGroup : entry.teacher;
 
   return (
-    <div className="schedule-course entity-schedule-course schedule-course-preview">
+    <div className="relative h-full rounded-md p-1 transition-shadow duration-150 hover:shadow-sm hover:ring-1 hover:ring-primary-200">
       <button
-        className="schedule-course-preview-target"
+        className="absolute inset-0 z-10 rounded-md"
         onClick={(event) => onPreviewEntry(entry, event.currentTarget)}
         type="button"
         aria-label={`预览${entry.courseName || "课程"}安排`}
       />
-      {view === "courses" ? (
-        <ScheduleClassGroup classGroup={primary} onNavigate={onNavigate} />
-      ) : (
-        <button className="schedule-entity-link" onClick={() => onNavigate("courses", entry.courseName)} type="button">
-          {primary || "未命名课程"}
-        </button>
-      )}
-      {view !== "teachers" ? (
-        <button className="schedule-entity-link" onClick={() => onNavigate("teachers", entry.teacher)} type="button">
-          {secondary || "未标注教师"}
-        </button>
-      ) : <ScheduleClassGroup classGroup={secondary} onNavigate={onNavigate} />}
-      {room ? (
-        <button className="schedule-entity-link schedule-room-link" onClick={() => onOpenRoom(room)} type="button">
-          {entry.roomName}
-        </button>
-      ) : (
-        <small>{entry.roomName || "未标注教室"}</small>
-      )}
+      <div className="pointer-events-none space-y-0.5">
+        {view === "courses" ? (
+          <ScheduleClassGroup classGroup={primary} onNavigate={onNavigate} />
+        ) : (
+          <button className="block max-w-full truncate text-left text-[11px] font-semibold text-primary-700" onClick={() => onNavigate("courses", entry.courseName)} type="button" tabIndex={-1}>
+            {primary || "未命名课程"}
+          </button>
+        )}
+        {view !== "teachers" ? (
+          <button className="block max-w-full truncate text-left text-[11px] text-gray-500" onClick={() => onNavigate("teachers", entry.teacher)} type="button" tabIndex={-1}>
+            {secondary || "未标注教师"}
+          </button>
+        ) : (
+          <ScheduleClassGroup classGroup={secondary} onNavigate={onNavigate} />
+        )}
+        {room ? (
+          <button className="block max-w-full truncate text-left text-[10px] font-medium text-gray-400" onClick={() => onOpenRoom(room)} type="button" tabIndex={-1}>
+            {entry.roomName}
+          </button>
+        ) : (
+          <small className="block truncate text-[10px] text-gray-400">{entry.roomName || "未标注教室"}</small>
+        )}
+      </div>
     </div>
   );
 }
@@ -167,7 +173,7 @@ export function SchedulePreviewPopover({ preview, onClose, onNavigate }) {
 
   const { entry, anchorRect } = preview;
   const classLabels = getEntryClassLabels(entry);
-  const cardWidth = Math.min(320, window.innerWidth - 24);
+  const cardWidth = Math.min(300, window.innerWidth - 24);
   const left = clamp(anchorRect.left, 12, Math.max(12, window.innerWidth - cardWidth - 12));
   const showAbove = anchorRect.bottom > window.innerHeight * 0.58;
   function navigate(view, label) {
@@ -178,37 +184,45 @@ export function SchedulePreviewPopover({ preview, onClose, onNavigate }) {
   return createPortal(
     <aside
       ref={popoverRef}
-      className={cn("schedule-preview-popover", showAbove && "is-above")}
+      className={cn(
+        "fixed z-50 animate-dialog-in rounded-xl border border-gray-200 bg-white p-3.5 shadow-xl",
+        showAbove && "-translate-y-full",
+      )}
       style={{ left, top: showAbove ? anchorRect.top - 10 : anchorRect.bottom + 10, width: cardWidth }}
       role="dialog"
       aria-label="课程安排预览"
     >
-      <div className="schedule-preview-header">
-        <span className="schedule-preview-label">课程</span>
-        <button className="schedule-preview-course" onClick={() => navigate("courses", entry.courseName)} type="button">
+      <div className="flex items-start gap-2.5">
+        <span className="w-8 shrink-0 pt-0.5 text-[11px] font-medium text-gray-400">课程</span>
+        <button className="min-w-0 flex-1 text-left text-sm font-semibold text-gray-900 transition-colors hover:text-primary-600" onClick={() => navigate("courses", entry.courseName)} type="button">
           {entry.courseName || "未命名课程"}
         </button>
-        <button className="icon-button schedule-preview-close" onClick={onClose} type="button" aria-label="关闭预览" title="关闭预览">
-          <X size={15} />
+        <button className="icon-btn -mt-0.5 -mr-0.5 h-6 w-6 shrink-0" onClick={onClose} type="button" aria-label="关闭预览" title="关闭预览">
+          <X size={14} />
         </button>
       </div>
-      <div className="schedule-preview-line">
-        <span className="schedule-preview-label">教师</span>
-        <button className="schedule-preview-value" onClick={() => navigate("teachers", entry.teacher)} type="button">
+      <div className="mt-2 flex items-start gap-2.5">
+        <span className="w-8 shrink-0 pt-0.5 text-[11px] font-medium text-gray-400">教师</span>
+        <button className="min-w-0 flex-1 truncate text-left text-xs text-gray-600 transition-colors hover:text-primary-600" onClick={() => navigate("teachers", entry.teacher)} type="button">
           {entry.teacher || "未标注教师"}
         </button>
       </div>
-      <div className="schedule-preview-line schedule-preview-class-line">
-        <span className="schedule-preview-label">班级</span>
-        <div className="schedule-preview-class-list">
+      <div className="mt-1.5 flex items-start gap-2.5">
+        <span className="w-8 shrink-0 pt-0.5 text-[11px] font-medium text-gray-400">班级</span>
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1">
           {classLabels.length ? (
             classLabels.map((classLabel) => (
-              <button className="schedule-preview-value" key={classLabel} onClick={() => navigate("classes", classLabel)} type="button">
+              <button
+                className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 transition-colors hover:bg-primary-50 hover:text-primary-700"
+                key={classLabel}
+                onClick={() => navigate("classes", classLabel)}
+                type="button"
+              >
                 {classLabel}
               </button>
             ))
           ) : (
-            <span className="schedule-preview-empty">未标注班级</span>
+            <span className="text-xs text-gray-400">未标注班级</span>
           )}
         </div>
       </div>
@@ -278,161 +292,183 @@ export function EntityScheduleDialog({
       : `${courseCount} 门课程 / ${teacherCount} 位教师`;
   return (
     <>
-      <div className="dialog-header">
-        <div>
-          <div className="dialog-eyebrow-row">
+      <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur-sm">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
             <DetailBackButton canGoBack={canGoBack} depth={backDepth} onBack={onBack} />
-            <div className="eyebrow">{getEntityDialogTitle(entity.view)}</div>
+            <div className="text-[11px] font-medium tracking-wide text-gray-400">{getEntityDialogTitle(entity.view)}</div>
           </div>
-          <h2>{entity.label}</h2>
-          <p>
-            <CalendarDays size={14} />
-            第 {selectedWeek} 周完整安排
+          <h2 className="mt-1 truncate text-xl font-semibold tracking-tight text-gray-900">{entity.label}</h2>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-1 text-[13px] text-gray-500">
+              <CalendarDays size={13} className="text-gray-400" />
+              第 {selectedWeek} 周完整安排
+            </span>
+            <SelectField
+              className="w-32"
+              label=""
+              value={String(selectedWeek)}
+              onChange={(value) => onWeekChange(Number(value))}
+              options={Array.from({ length: maxWeek }, (_, index) => ({
+                value: String(index + 1),
+                label: `第 ${index + 1} 周`,
+              }))}
+            />
           </p>
-          <SelectField
-            className="entity-week-control"
-            label="查看周次"
-            value={String(selectedWeek)}
-            onChange={(value) => onWeekChange(Number(value))}
-            options={Array.from({ length: maxWeek }, (_, index) => ({
-              value: String(index + 1),
-              label: `第 ${index + 1} 周`,
-            }))}
-          />
         </div>
-        <div className="dialog-header-actions">
-          <button className="icon-button dialog-close" onClick={onClose} type="button" aria-label="关闭">
-            <X size={19} />
+        <div className="flex shrink-0 items-center gap-1">
+          <button className="icon-btn" onClick={onClose} type="button" aria-label="关闭">
+            <X size={18} />
           </button>
         </div>
       </div>
 
-      <div className="dialog-summary">
-        <div>
-          <span>本周安排</span>
-          <strong>{weekEntries.length} 项</strong>
-        </div>
-        <div>
-          <span>关联信息</span>
-          <strong>{relatedLabel}</strong>
-        </div>
-        <div>
-          <span>涉及教室</span>
-          <strong>{roomCount} 间</strong>
-        </div>
-      </div>
-
-      <div className="entity-live-grid">
-        <div className="entity-live-item">
-          <Clock3 size={16} />
-          <div>
-            <span>当前定位</span>
-            <strong>{selectedDay?.shortLabel} {selectedPeriodLabel}</strong>
-            <small>{selectedEntriesForDisplay.length ? `${selectedEntriesForDisplay.length} 项安排` : "暂无安排"}</small>
+      <div className="space-y-4 px-5 py-4">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-lg bg-gray-50 px-3 py-2">
+            <span className="block text-[11px] text-gray-500">本周安排</span>
+            <strong className="block truncate text-sm font-semibold text-gray-900">{weekEntries.length} 项</strong>
+          </div>
+          <div className="rounded-lg bg-gray-50 px-3 py-2">
+            <span className="block text-[11px] text-gray-500">关联信息</span>
+            <strong className="block truncate text-sm font-semibold text-gray-900">{relatedLabel}</strong>
+          </div>
+          <div className="rounded-lg bg-gray-50 px-3 py-2">
+            <span className="block text-[11px] text-gray-500">涉及教室</span>
+            <strong className="block truncate text-sm font-semibold text-gray-900">{roomCount} 间</strong>
           </div>
         </div>
-        <div className="entity-live-item">
-          <ArrowUpRight size={16} />
-          <div>
-            <span>{liveStatus?.currentEntries.length ? "正在上课" : "下一节课程"}</span>
-            <strong>
-              {liveStatus?.currentEntries[0]?.courseName || liveStatus?.nextEntry?.courseName || "当前周暂无后续课程"}
-            </strong>
-            <small>
-              {liveStatus?.currentEntries.length
-                ? "当前时间段"
-                : liveStatus?.nextEntry
-                  ? `${data.weekdays.find((day) => day.index === liveStatus.nextEntry.weekday)?.shortLabel ?? ""} · ${liveStatus.nextEntry.periodCode}`
-                  : "请选择其他周次查看安排"}
-            </small>
-          </div>
-        </div>
-      </div>
 
-      <div className="entity-filter-row">
-        <div className="filter-title"><Filter size={15} /> 课表筛选</div>
-        {entity.view !== "courses" ? (
-          <SelectField
-            className="entity-filter-field"
-            label="课程"
-            value={entity.courseFilter || ""}
-            onChange={(value) => onFilterChange("courseFilter", value)}
-            options={[
-              { value: "", label: "全部课程" },
-              ...relatedCourses.map((item) => ({ value: item, label: item })),
-            ]}
-          />
-        ) : null}
-        {entity.view !== "teachers" ? (
-          <SelectField
-            className="entity-filter-field"
-            label="教师"
-            value={entity.teacherFilter || ""}
-            onChange={(value) => onFilterChange("teacherFilter", value)}
-            options={[
-              { value: "", label: "全部教师" },
-              ...relatedTeachers.map((item) => ({ value: item, label: item })),
-            ]}
-          />
-        ) : null}
-        {entity.view !== "classes" ? (
-          <SelectField
-            className="entity-filter-field"
-            label="班级"
-            value={entity.classFilter || ""}
-            onChange={(value) => onFilterChange("classFilter", value)}
-            options={[
-              { value: "", label: "全部班级" },
-              ...relatedClasses.map((item) => ({ value: item, label: item })),
-            ]}
-          />
-        ) : null}
-      </div>
-
-      <div className="schedule">
-        <div className="schedule-head">
-          <div className="schedule-corner">节次</div>
-          {data.weekdays.map((day) => (
-            <div className="schedule-day" key={day.index}>
-              {day.shortLabel}
+        <div className="grid gap-2.5 md:grid-cols-2">
+          <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 p-3.5">
+            <Clock3 size={15} className="mt-0.5 shrink-0 text-primary-500" />
+            <div className="min-w-0">
+              <span className="block text-[11px] text-gray-500">当前定位</span>
+              <strong className="block truncate text-sm font-semibold text-gray-900">
+                {selectedDay?.shortLabel} {selectedPeriodLabel}
+              </strong>
+              <small className="mt-0.5 block text-xs text-gray-400">
+                {selectedEntriesForDisplay.length ? `${selectedEntriesForDisplay.length} 项安排` : "暂无安排"}
+              </small>
             </div>
-          ))}
-        </div>
-        {data.timeSlots.map((slot) => (
-          <div className="schedule-row" key={slot.code}>
-            <div className="schedule-slot">
-              <strong>{slot.label}</strong>
-              <span>
-                {slot.start} - {slot.end}
+          </div>
+          <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 p-3.5">
+            <ArrowUpRight size={15} className="mt-0.5 shrink-0 text-primary-500" />
+            <div className="min-w-0">
+              <span className="block text-[11px] text-gray-500">
+                {liveStatus?.currentEntries.length ? "正在上课" : "下一节课程"}
               </span>
+              <strong className="block truncate text-sm font-semibold text-gray-900">
+                {liveStatus?.currentEntries[0]?.courseName || liveStatus?.nextEntry?.courseName || "当前周暂无后续课程"}
+              </strong>
+              <small className="mt-0.5 block truncate text-xs text-gray-400">
+                {liveStatus?.currentEntries.length
+                  ? "当前时间段"
+                  : liveStatus?.nextEntry
+                    ? `${data.weekdays.find((day) => day.index === liveStatus.nextEntry.weekday)?.shortLabel ?? ""} · ${liveStatus.nextEntry.periodCode}`
+                    : "请选择其他周次查看安排"}
+              </small>
             </div>
-            {data.weekdays.map((day) => {
-              const entries = detailEntries.filter((entry) => entry.weekday === day.index && entry.periodCode === slot.code);
-              return (
-                <div className={cn("schedule-cell", entries.length && "is-occupied")} key={`${day.index}-${slot.code}`}>
-                  {entries.length ? (
-                    <ExpandableScheduleEntries
-                      entries={entries}
-                      renderEntry={(entry, index) => (
-                        <EntityScheduleCell
-                          key={`${entry.courseName}-${entry.teacher}-${entry.classGroup}-${entry.roomName}-${index}`}
-                          entry={entry}
-                          view={entity.view}
-                          room={roomByName.get(entry.roomName)}
-                          onNavigate={onNavigate}
-                          onOpenRoom={onOpenRoom}
-                          onPreviewEntry={onPreviewEntry}
-                        />
-                      )}
-                    />
-                  ) : (
-                    <span className="schedule-free">无课</span>
-                  )}
-                </div>
-              );
-            })}
           </div>
-        ))}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="inline-flex h-9 items-center gap-1.5 text-xs font-medium text-gray-500">
+            <Filter size={14} className="text-gray-400" />
+            课表筛选
+          </div>
+          {entity.view !== "courses" ? (
+            <SelectField
+              className="w-44"
+              label="课程"
+              value={entity.courseFilter || ""}
+              onChange={(value) => onFilterChange("courseFilter", value)}
+              options={[
+                { value: "", label: "全部课程" },
+                ...relatedCourses.map((item) => ({ value: item, label: item })),
+              ]}
+            />
+          ) : null}
+          {entity.view !== "teachers" ? (
+            <SelectField
+              className="w-44"
+              label="教师"
+              value={entity.teacherFilter || ""}
+              onChange={(value) => onFilterChange("teacherFilter", value)}
+              options={[
+                { value: "", label: "全部教师" },
+                ...relatedTeachers.map((item) => ({ value: item, label: item })),
+              ]}
+            />
+          ) : null}
+          {entity.view !== "classes" ? (
+            <SelectField
+              className="w-44"
+              label="班级"
+              value={entity.classFilter || ""}
+              onChange={(value) => onFilterChange("classFilter", value)}
+              options={[
+                { value: "", label: "全部班级" },
+                ...relatedClasses.map((item) => ({ value: item, label: item })),
+              ]}
+            />
+          ) : null}
+        </div>
+
+        <p className="mb-1.5 text-right text-[10px] text-gray-300 sm:hidden">← 左右滑动查看整周课表 →</p>
+        <div className="overflow-x-auto">
+          <div className="min-w-[740px] overflow-hidden rounded-xl border border-gray-200">
+            <div className={cn("grid bg-gray-50/80", SCHEDULE_GRID_COLS)}>
+              <div className="px-2.5 py-2 text-left text-[11px] font-medium text-gray-400">节次</div>
+              {data.weekdays.map((day) => (
+                <div className="border-l border-gray-100 px-1 py-2 text-center text-xs font-medium text-gray-600" key={day.index}>
+                  {day.shortLabel}
+                </div>
+              ))}
+            </div>
+            {data.timeSlots.map((slot) => (
+              <div className={cn("grid border-t border-gray-100", SCHEDULE_GRID_COLS)} key={slot.code}>
+                <div className="flex flex-col justify-center border-r border-gray-100 bg-gray-50/60 px-2 py-1.5">
+                  <strong className="text-[11px] font-semibold text-gray-700">{slot.label}</strong>
+                  <span className="text-[10px] tabular-nums text-gray-400">
+                    {slot.start} - {slot.end}
+                  </span>
+                </div>
+                {data.weekdays.map((day) => {
+                  const entries = detailEntries.filter((entry) => entry.weekday === day.index && entry.periodCode === slot.code);
+                  return (
+                    <div
+                      className={cn(
+                        "min-h-[54px] border-r border-gray-100 p-1 last:border-r-0",
+                        entries.length && "bg-primary-50/40",
+                      )}
+                      key={`${day.index}-${slot.code}`}
+                    >
+                      {entries.length ? (
+                        <ExpandableScheduleEntries
+                          entries={entries}
+                          renderEntry={(entry, index) => (
+                            <EntityScheduleCell
+                              key={`${entry.courseName}-${entry.teacher}-${entry.classGroup}-${entry.roomName}-${index}`}
+                              entry={entry}
+                              view={entity.view}
+                              room={roomByName.get(entry.roomName)}
+                              onNavigate={onNavigate}
+                              onOpenRoom={onOpenRoom}
+                              onPreviewEntry={onPreviewEntry}
+                            />
+                          )}
+                        />
+                      ) : (
+                        <span className="flex h-full min-h-[46px] items-center justify-center text-[11px] text-gray-300">无课</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </>
   );

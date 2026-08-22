@@ -18,28 +18,46 @@ export function TemporalPicker({
   dateRange,
 }) {
   return (
-    <div className="temporal-picker">
+    <div className="min-w-0">
       {onToday ? (
-        <div className="temporal-now-row">
-          <button className="button button-outline panel-now-button" onClick={onToday} type="button">
+        <div className="mb-2.5">
+          <button
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 shadow-xs transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700"
+            onClick={onToday}
+            type="button"
+          >
             快速选择当前时间
           </button>
         </div>
       ) : null}
-      <div className="field-label-row">
-        <span className="field-label">日期选择</span>
-        <div className="binary-toggle" role="group" aria-label="周次或日期">
-          <button className={cn(mode === "week" && "is-active")} onClick={() => onModeChange("week")} type="button">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-gray-500">日期选择</span>
+        <div className="flex gap-0.5 rounded-lg bg-gray-100 p-0.5" role="group" aria-label="周次或日期">
+          <button
+            className={cn(
+              "h-7 rounded-md px-3 text-xs font-medium transition-all duration-150",
+              mode === "week" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+            )}
+            onClick={() => onModeChange("week")}
+            type="button"
+          >
             周次
           </button>
-          <button className={cn(mode === "date" && "is-active")} onClick={() => onModeChange("date")} type="button">
+          <button
+            className={cn(
+              "h-7 rounded-md px-3 text-xs font-medium transition-all duration-150",
+              mode === "date" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+            )}
+            onClick={() => onModeChange("date")}
+            type="button"
+          >
             日期
           </button>
         </div>
       </div>
 
       {mode === "week" ? (
-        <div className="temporal-fields">
+        <div className="mt-1.5 grid grid-cols-2 gap-2">
           <SelectField
             label=""
             value={String(selectedWeek)}
@@ -58,14 +76,15 @@ export function TemporalPicker({
           />
         </div>
       ) : (
-        <label className="date-input-wrap">
-          <CalendarDays size={16} />
+        <label className="relative mt-1.5 block">
+          <CalendarDays size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />
           <input
             type="date"
             value={selectedDate}
             min={dateRange.min}
             max={dateRange.max}
             onChange={(event) => onDateChange(event.target.value)}
+            className="field-input h-9 pl-9"
           />
         </label>
       )}
@@ -89,28 +108,54 @@ export function PeriodPicker({ timeSlots, selectedPeriods, selectionMode, onMode
   }
 
   return (
-    <div className="period-picker">
-      <div className="field-label-row">
-        <span className="field-label">节次</span>
-        <div className="binary-toggle" role="group" aria-label="节次单选或多选">
-          <button className={cn(selectionMode === "single" && "is-active")} onClick={() => onModeChange("single")} type="button">
+    <div className="min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-gray-500">节次</span>
+        <div className="flex gap-0.5 rounded-lg bg-gray-100 p-0.5" role="group" aria-label="节次单选或多选">
+          <button
+            className={cn(
+              "h-7 rounded-md px-3 text-xs font-medium transition-all duration-150",
+              selectionMode === "single" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+            )}
+            onClick={() => onModeChange("single")}
+            type="button"
+          >
             单选
           </button>
-          <button className={cn(selectionMode === "multiple" && "is-active")} onClick={() => onModeChange("multiple")} type="button">
+          <button
+            className={cn(
+              "h-7 rounded-md px-3 text-xs font-medium transition-all duration-150",
+              selectionMode === "multiple" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+            )}
+            onClick={() => onModeChange("multiple")}
+            type="button"
+          >
             多选
           </button>
         </div>
       </div>
-      <div className="period-options">
+      <div className="mt-1.5 grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-3 xl:grid-cols-6">
         {timeSlots.map((slot) => {
           const selected = selectedPeriods.includes(slot.code);
           return (
-            <button className={cn("period-option", selected && "is-selected")} onClick={() => togglePeriod(slot.code)} type="button" key={slot.code}>
-              <span>{slot.label}</span>
-              <small>
+            <button
+              className={cn(
+                "relative flex flex-col items-start rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150",
+                selected
+                  ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500"
+                  : "border-gray-200 bg-white hover:border-gray-300",
+              )}
+              onClick={() => togglePeriod(slot.code)}
+              type="button"
+              key={slot.code}
+            >
+              <span className={cn("text-[13px] font-semibold", selected ? "text-primary-700" : "text-gray-700")}>
+                {slot.label}
+              </span>
+              <small className="text-[11px] tabular-nums text-gray-400">
                 {slot.start}-{slot.end}
               </small>
-              {selected ? <Check size={14} /> : null}
+              {selected ? <Check size={13} className="absolute top-1.5 right-1.5 text-primary-600" /> : null}
             </button>
           );
         })}

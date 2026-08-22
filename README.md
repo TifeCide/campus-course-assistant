@@ -26,6 +26,7 @@
 
 - React 19
 - Vite 6
+- Tailwind CSS v4
 - lucide-react
 - 原生 `fetch`、`localStorage` 和浏览器 URL API
 - GitHub Actions + GitHub Pages
@@ -109,7 +110,8 @@ npm run update-data
 ├─ src/
 │  ├─ App.jsx                           应用主组件：数据加载编排、筛选逻辑与页面组合
 │  ├─ main.jsx                          React 应用入口
-│  ├─ styles.css                        全部页面样式
+│  ├─ styles/
+│  │  └─ tokens.css                     Tailwind v4 主题令牌、基础样式与组件类
 │  ├─ config.js                         多源资源地址、加载进度估算和构建时间
 │  ├─ constants.js                      默认设置与存储键等常量
 │  ├─ components/                       可复用 UI 组件（对话框、卡片、选择器、通知等）
@@ -275,7 +277,7 @@ public/data/setting.json
 | `searchResultLimit` | 数字 | 课程检索最多显示的结果数量 |
 | `enableCommandPalette` | 布尔值 | 是否启用命令面板和快速搜索 |
 | `enableBackToTop` | 布尔值 | 是否启用回到顶部按钮 |
-| `stickyFilters` | 布尔值 | 是否启用筛选栏吸顶 |
+| `stickyFilters` | 布尔值 | 保留的历史配置字段，当前筛选栏固定为随页面滚动，滚动到结果区时自动收起 |
 | `schoolTimeZone` | 字符串 | 学校时区配置字段，当前时间计算固定使用 `Asia/Shanghai` |
 
 当前配置示例：
@@ -303,7 +305,7 @@ public/data/setting.json
 
 补充细节：
 
-- `enableCommandPalette` / `enableBackToTop` / `stickyFilters`：仅当值显式为 `false` 时关闭，缺失时按开启处理。
+- `enableCommandPalette` / `enableBackToTop`：仅当值显式为 `false` 时关闭，缺失时按开启处理。`stickyFilters` 为保留字段，不再控制吸顶。
 - `searchResultLimit` 读取时会转为数字，空值或非法值会回退到默认值。
 - `maskMessage` 兼容旧字段拼写（`tittle`）并归一化到 `title`。
 - `schoolTimeZone` 当前仅作为配置字段保留，应用内部日期判断固定按 `Asia/Shanghai` 执行。

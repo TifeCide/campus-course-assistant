@@ -20,11 +20,11 @@ export function BrandMarkIcon() {
   );
 }
 
-/*定义了一个 ShieldIcon 组件，用于在结果遮罩中显示一个闪烁的图标： */
+/*定义了一个 ShieldIcon 组件，用于在结果遮罩中显示一个图标： */
 export function ShieldIcon() {
   return (
-    <div className="results-mask-icon">
-      <Sparkles size={18} />
+    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+      <Sparkles size={20} />
     </div>
   );
 }
