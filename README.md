@@ -247,16 +247,17 @@ GitHub Actions 只构建已提交的数据，不再解析原始 HTML。因此更
 public/data/room-attributes.json
 ```
 
-该文件不参与课表解析管道，完全手工维护。字段结构：
+该文件不参与课表解析管道，完全手工维护。结构为“类型字典 + 教室列表”两层：
 
 ```json
 {
-  "schemaVersion": 1,
-  "attributes": {
-    "厚德楼A101": {
-      "label": "机房",
-      "tone": "amber",
-      "detail": "仅上课期间开放，日常使用需预约"
+  "roomtype": {
+    "1": "机房",
+    "2": "会议室"
+  },
+  "list": {
+    "1-101": {
+      "roomType": "1"
     }
   }
 }
@@ -264,9 +265,9 @@ public/data/room-attributes.json
 
 说明：
 
-- 键为教室完整名称，需与课表数据中的教室名完全一致；名称匹配不到时静默忽略。
-- `label` 为徽章显示文字（必填）；`detail` 可选，悬停时作为提示展示。
-- `tone` 可选，控制徽章配色：`blue` / `green` / `amber` / `red` / `gray`，缺省为 `gray`。
+- `roomtype` 为类型字典：键是类型编号，值是徽章显示文字；新增类型只需在这里加一行。
+- `list` 键为教室完整名称（需与课表数据中的教室名完全一致，匹配不到时静默忽略），`roomType` 指向类型编号。
+- 可选 `detail` 字段（写在 list 条目里），悬停徽章时作为提示展示。
 - 文件缺失或加载失败时静默降级：页面功能不受影响，仅不显示徽章。
 - 该文件位于 `public/data/`，修改后执行 `npm run build` 随构建发布即可，无需重新解析课表。
 

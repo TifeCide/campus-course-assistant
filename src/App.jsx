@@ -571,14 +571,23 @@ function App() {
   );
 
   const roomByName = useMemo(() => new Map((data?.rooms ?? []).map((room) => [room.name, room])), [data]);
+  /* 教室外挂属性：roomtype 为类型字典（id -> 名称），list 将教室名映射到类型 id，两者关联后生成徽章数据。 */
   const attributeByName = useMemo(() => {
-    const entries = roomAttributeData?.attributes;
-    if (!entries || typeof entries !== "object") return null;
-    return new Map(
-      Object.entries(entries)
-        .filter(([, value]) => value && typeof value === "object" && typeof value.label === "string" && value.label)
-        .map(([name, value]) => [String(name), value]),
-    );
+    const types = roomAttributeData?.roomtype;
+    const list = roomAttributeData?.list;
+    if (!types || typeof types !== "object" || !list || typeof list !== "object") return null;
+
+    const map = new Map();
+    for (const [name, entry] of Object.entries(list)) {
+      const label = types[entry?.roomType];
+      if (typeof label === "string" && label && !map.has(String(name))) {
+        map.set(String(name), {
+          label,
+          detail: typeof entry?.detail === "string" ? entry.detail : "",
+        });
+      }
+    }
+    return map;
   }, [roomAttributeData]);
   const courseResults = useMemo(() => {
     if (!data || !scheduleData) return [];

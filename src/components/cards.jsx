@@ -2,14 +2,6 @@ import { ArrowUpRight, BookOpen, Heart, UserRound, Users } from "lucide-react";
 import { cn } from "../utils/misc";
 import { getRoomEntriesForPeriods } from "../utils/rooms";
 
-const ATTRIBUTE_TONES = {
-  blue: "bg-primary-50 text-primary-700",
-  green: "bg-success-50 text-success-700",
-  amber: "bg-warning-50 text-warning-700",
-  red: "bg-danger-50 text-danger-700",
-  gray: "bg-gray-100 text-gray-600",
-};
-
 /* 创建一个教室卡片组件，显示教室的占用状态、名称、建筑物、楼层、区域以及收藏状态。接受教室对象、打开回调函数、选定的周次、星期几、节次、收藏状态和收藏切换回调函数作为属性： */
 export function RoomCard({
   room,
@@ -42,10 +34,7 @@ export function RoomCard({
           </span>
           {attribute ? (
             <span
-              className={cn(
-                "min-w-0 truncate rounded-full border border-white/70 px-2 py-0.5 text-[11px] font-medium",
-                ATTRIBUTE_TONES[attribute.tone] ?? ATTRIBUTE_TONES.gray,
-              )}
+              className="min-w-0 truncate rounded-full border border-white/70 bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700"
               title={attribute.detail || attribute.label}
             >
               {attribute.label}
