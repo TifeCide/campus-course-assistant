@@ -1,6 +1,6 @@
 import { CalendarDays, Check } from "lucide-react";
 import { cn } from "../utils/misc";
-import { SelectField } from "./ui";
+import { SegmentedThumb, SelectField } from "./ui";
 
 /* 创建一个时间选择器组件，允许用户在周次模式和日期模式之间切换，并选择特定的周次、星期几或日期。根据当前模式渲染相应的选择字段，并提供快速选择当前时间的按钮： */
 export function TemporalPicker({
@@ -22,7 +22,7 @@ export function TemporalPicker({
       {onToday ? (
         <div className="mb-2.5">
           <button
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 shadow-xs transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-600 shadow-xs transition-all duration-150 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 active:scale-[0.97]"
             onClick={onToday}
             type="button"
           >
@@ -32,11 +32,12 @@ export function TemporalPicker({
       ) : null}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-gray-500">日期选择</span>
-        <div className="flex gap-0.5 rounded-lg bg-gray-100 p-0.5" role="group" aria-label="周次或日期">
+        <div className="relative flex gap-0.5 rounded-lg bg-gray-100 p-0.5" role="group" aria-label="周次或日期">
+          <SegmentedThumb count={2} index={mode === "week" ? 0 : 1} padding={2} gap={2} />
           <button
             className={cn(
-              "h-7 rounded-md px-3 text-xs font-medium transition-all duration-150",
-              mode === "week" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+              "relative z-10 h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 active:scale-[0.96]",
+              mode === "week" ? "text-gray-900" : "text-gray-500 hover:text-gray-800",
             )}
             onClick={() => onModeChange("week")}
             type="button"
@@ -45,8 +46,8 @@ export function TemporalPicker({
           </button>
           <button
             className={cn(
-              "h-7 rounded-md px-3 text-xs font-medium transition-all duration-150",
-              mode === "date" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+              "relative z-10 h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 active:scale-[0.96]",
+              mode === "date" ? "text-gray-900" : "text-gray-500 hover:text-gray-800",
             )}
             onClick={() => onModeChange("date")}
             type="button"
@@ -111,11 +112,12 @@ export function PeriodPicker({ timeSlots, selectedPeriods, selectionMode, onMode
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-gray-500">节次</span>
-        <div className="flex gap-0.5 rounded-lg bg-gray-100 p-0.5" role="group" aria-label="节次单选或多选">
+        <div className="relative flex gap-0.5 rounded-lg bg-gray-100 p-0.5" role="group" aria-label="节次单选或多选">
+          <SegmentedThumb count={2} index={selectionMode === "single" ? 0 : 1} padding={2} gap={2} />
           <button
             className={cn(
-              "h-7 rounded-md px-3 text-xs font-medium transition-all duration-150",
-              selectionMode === "single" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+              "relative z-10 h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 active:scale-[0.96]",
+              selectionMode === "single" ? "text-gray-900" : "text-gray-500 hover:text-gray-800",
             )}
             onClick={() => onModeChange("single")}
             type="button"
@@ -124,8 +126,8 @@ export function PeriodPicker({ timeSlots, selectedPeriods, selectionMode, onMode
           </button>
           <button
             className={cn(
-              "h-7 rounded-md px-3 text-xs font-medium transition-all duration-150",
-              selectionMode === "multiple" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+              "relative z-10 h-7 rounded-md px-3 text-xs font-medium transition-colors duration-150 active:scale-[0.96]",
+              selectionMode === "multiple" ? "text-gray-900" : "text-gray-500 hover:text-gray-800",
             )}
             onClick={() => onModeChange("multiple")}
             type="button"
@@ -134,13 +136,13 @@ export function PeriodPicker({ timeSlots, selectedPeriods, selectionMode, onMode
           </button>
         </div>
       </div>
-      <div className="mt-1.5 grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="mt-1.5 grid grid-cols-3 gap-2">
         {timeSlots.map((slot) => {
           const selected = selectedPeriods.includes(slot.code);
           return (
             <button
               className={cn(
-                "relative flex flex-col items-start rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150",
+                "relative flex flex-col items-start rounded-lg border px-2.5 py-1.5 text-left transition-all duration-150 active:scale-[0.96]",
                 selected
                   ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500"
                   : "border-gray-200 bg-white hover:border-gray-300",

@@ -239,6 +239,37 @@ GitHub Actions 只构建已提交的数据，不再解析原始 HTML。因此更
 - `manifest.json` 的 `files.*.path` 是前端后续读取路径的唯一入口，手工改文件名时必须同步更新 manifest。
 - 目录检索优先使用 `directory.json` 的实体索引；一旦启用位置筛选（楼栋/楼层/区域），会切换到完整课表数据做精确过滤。
 
+### 教室属性徽章（room-attributes.json）
+
+部分教室具有特殊属性（如机房、不开门的大教室），通过人工维护的外挂数据文件标记：
+
+```text
+public/data/room-attributes.json
+```
+
+该文件不参与课表解析管道，完全手工维护。字段结构：
+
+```json
+{
+  "schemaVersion": 1,
+  "attributes": {
+    "厚德楼A101": {
+      "label": "机房",
+      "tone": "amber",
+      "detail": "仅上课期间开放，日常使用需预约"
+    }
+  }
+}
+```
+
+说明：
+
+- 键为教室完整名称，需与课表数据中的教室名完全一致；名称匹配不到时静默忽略。
+- `label` 为徽章显示文字（必填）；`detail` 可选，悬停时作为提示展示。
+- `tone` 可选，控制徽章配色：`blue` / `green` / `amber` / `red` / `gray`，缺省为 `gray`。
+- 文件缺失或加载失败时静默降级：页面功能不受影响，仅不显示徽章。
+- 该文件位于 `public/data/`，修改后执行 `npm run build` 随构建发布即可，无需重新解析课表。
+
 ### 数据源回退顺序（运行时）
 
 所有运行时 JSON（`setting.json` 和 v2 文件）都使用同一回退顺序：

@@ -12,6 +12,23 @@ import {
 } from "lucide-react";
 import { cn } from "../utils/misc";
 
+/* 分段控件的滑动白色指示块：根据 count 与当前 index 计算宽度与位移，配合父级 relative 容器使用： */
+export function SegmentedThumb({ count, index, padding = 4, gap = 2 }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute rounded-md bg-white shadow-xs transition-transform duration-200 ease-out"
+      style={{
+        top: padding,
+        bottom: padding,
+        left: padding,
+        width: `calc((100% - ${padding * 2 + (count - 1) * gap}px) / ${count})`,
+        transform: `translateX(calc(${index} * (100% + ${gap}px)))`,
+      }}
+    />
+  );
+}
+
 /* 创建一个选择字段组件，接受标签、值、选项和图标作为属性，并在值变化时调用回调函数。渲染一个带有标签和下拉选择框的表单字段，如果提供了图标，则在选择框前显示图标： */
 export function SelectField({ label, value, onChange, options, icon: Icon, className = "", minWidth = 176 }) {
   const [open, setOpen] = useState(false);
@@ -63,7 +80,7 @@ export function SelectField({ label, value, onChange, options, icon: Icon, class
       <div ref={rootRef} className="relative">
         <button
           className={cn(
-            "flex h-9 w-full items-center gap-2 rounded-lg border bg-white px-3 text-sm shadow-xs transition-colors duration-150",
+            "flex h-9 w-full items-center gap-2 rounded-lg border bg-white px-3 text-sm shadow-xs transition-all duration-150 active:scale-[0.99]",
             open ? "border-primary-400 ring-4 ring-primary-500/10" : "border-gray-200 hover:border-gray-300",
           )}
           onClick={() => setOpen((current) => !current)}
@@ -82,7 +99,7 @@ export function SelectField({ label, value, onChange, options, icon: Icon, class
         </button>
         {open ? (
           <div
-            className="absolute z-20 mt-1.5 max-h-72 animate-dialog-in overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg"
+            className="absolute z-50 mt-1.5 max-h-72 animate-dialog-in overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg"
             role="listbox"
             style={menuStyle ?? undefined}
           >
@@ -178,7 +195,7 @@ export function MultiSelectField({ label, values, onChange, options, icon: Icon,
       <div ref={rootRef} className="relative">
         <button
           className={cn(
-            "flex h-9 w-full items-center gap-2 rounded-lg border bg-white px-3 text-sm shadow-xs transition-colors duration-150",
+            "flex h-9 w-full items-center gap-2 rounded-lg border bg-white px-3 text-sm shadow-xs transition-all duration-150 active:scale-[0.99]",
             open ? "border-primary-400 ring-4 ring-primary-500/10" : "border-gray-200 hover:border-gray-300",
           )}
           onClick={() => setOpen((value) => !value)}
@@ -196,7 +213,7 @@ export function MultiSelectField({ label, values, onChange, options, icon: Icon,
         </button>
         {open ? (
           <div
-            className="absolute z-20 mt-1.5 max-h-72 animate-dialog-in overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg"
+            className="absolute z-50 mt-1.5 max-h-72 animate-dialog-in overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg"
             style={menuStyle ?? undefined}
           >
             <button
@@ -423,7 +440,7 @@ export function ExpandableScheduleEntries({ entries, collapsedCount = 2, renderE
       {visibleEntries.map((entry, index) => renderEntry(entry, index))}
       {hiddenCount > 0 ? (
         <button
-          className="-ml-0.5 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-[11px] font-medium text-primary-600 transition-colors hover:bg-primary-50"
+          className="-ml-0.5 inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-[11px] font-medium text-primary-600 transition-all duration-150 hover:bg-primary-50 active:scale-[0.95]"
           onClick={() => setExpanded((value) => !value)}
           type="button"
           aria-expanded={expanded}

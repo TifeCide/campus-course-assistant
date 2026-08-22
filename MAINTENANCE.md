@@ -159,6 +159,7 @@ npm run build
 | `src/main.jsx` | React 应用入口 |
 | `public/data/v2/` | 前端实际读取的模块化数据 |
 | `public/data/setting.json` | 网站行为配置 |
+| `public/data/room-attributes.json` | 教室属性徽章外挂数据（人工维护，可选） |
 | `scripts/build-data.js` | 课表 HTML 解析与 v2 数据构建的统一入口 |
 | `scripts/verify-data-v2.js` | v2 一致性校验 |
 | `scripts/class-normalization.json` | 班级别名和拆分配置 |

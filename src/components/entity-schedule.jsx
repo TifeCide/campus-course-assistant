@@ -292,7 +292,7 @@ export function EntityScheduleDialog({
       : `${courseCount} 门课程 / ${teacherCount} 位教师`;
   return (
     <>
-      <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur-sm">
+      <div className="sticky top-0 z-40 flex items-start justify-between gap-3 border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur-sm">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <DetailBackButton canGoBack={canGoBack} depth={backDepth} onBack={onBack} />
@@ -324,7 +324,7 @@ export function EntityScheduleDialog({
       </div>
 
       <div className="space-y-4 px-5 py-4">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="relative z-30 grid animate-slide-up grid-cols-3 gap-2">
           <div className="rounded-lg bg-gray-50 px-3 py-2">
             <span className="block text-[11px] text-gray-500">本周安排</span>
             <strong className="block truncate text-sm font-semibold text-gray-900">{weekEntries.length} 项</strong>
@@ -339,7 +339,7 @@ export function EntityScheduleDialog({
           </div>
         </div>
 
-        <div className="grid gap-2.5 md:grid-cols-2">
+        <div className="relative z-20 grid animate-slide-up gap-2.5 md:grid-cols-2" style={{ animationDelay: "60ms" }}>
           <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 p-3.5">
             <Clock3 size={15} className="mt-0.5 shrink-0 text-primary-500" />
             <div className="min-w-0">
@@ -372,7 +372,7 @@ export function EntityScheduleDialog({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="relative z-10 flex animate-slide-up flex-wrap items-end gap-2" style={{ animationDelay: "100ms" }}>
           <div className="inline-flex h-9 items-center gap-1.5 text-xs font-medium text-gray-500">
             <Filter size={14} className="text-gray-400" />
             课表筛选
@@ -415,7 +415,8 @@ export function EntityScheduleDialog({
           ) : null}
         </div>
 
-        <p className="mb-1.5 text-right text-[10px] text-gray-300 sm:hidden">← 左右滑动查看整周课表 →</p>
+        <div className="animate-slide-up" style={{ animationDelay: "140ms" }}>
+          <p className="mb-1.5 text-right text-[10px] text-gray-300 sm:hidden">← 左右滑动查看整周课表 →</p>
         <div className="overflow-x-auto">
           <div className="min-w-[740px] overflow-hidden rounded-xl border border-gray-200">
             <div className={cn("grid bg-gray-50/80", SCHEDULE_GRID_COLS)}>
@@ -430,9 +431,8 @@ export function EntityScheduleDialog({
               <div className={cn("grid border-t border-gray-100", SCHEDULE_GRID_COLS)} key={slot.code}>
                 <div className="flex flex-col justify-center border-r border-gray-100 bg-gray-50/60 px-2 py-1.5">
                   <strong className="text-[11px] font-semibold text-gray-700">{slot.label}</strong>
-                  <span className="text-[10px] tabular-nums text-gray-400">
-                    {slot.start} - {slot.end}
-                  </span>
+                  <span className="block text-[10px] leading-snug tabular-nums text-gray-400">&nbsp;{slot.start}</span>
+                  <span className="block text-[10px] leading-snug tabular-nums text-gray-400">&nbsp;{slot.end}</span>
                 </div>
                 {data.weekdays.map((day) => {
                   const entries = detailEntries.filter((entry) => entry.weekday === day.index && entry.periodCode === slot.code);
@@ -468,6 +468,7 @@ export function EntityScheduleDialog({
               </div>
             ))}
           </div>
+        </div>
         </div>
       </div>
     </>

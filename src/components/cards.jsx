@@ -2,6 +2,14 @@ import { ArrowUpRight, BookOpen, Heart, UserRound, Users } from "lucide-react";
 import { cn } from "../utils/misc";
 import { getRoomEntriesForPeriods } from "../utils/rooms";
 
+const ATTRIBUTE_TONES = {
+  blue: "bg-primary-50 text-primary-700",
+  green: "bg-success-50 text-success-700",
+  amber: "bg-warning-50 text-warning-700",
+  red: "bg-danger-50 text-danger-700",
+  gray: "bg-gray-100 text-gray-600",
+};
+
 /* 创建一个教室卡片组件，显示教室的占用状态、名称、建筑物、楼层、区域以及收藏状态。接受教室对象、打开回调函数、选定的周次、星期几、节次、收藏状态和收藏切换回调函数作为属性： */
 export function RoomCard({
   room,
@@ -11,26 +19,38 @@ export function RoomCard({
   selectedPeriods,
   isFavorite,
   onToggleFavorite,
+  attribute,
 }) {
   const occupied = getRoomEntriesForPeriods(room, selectedWeekday, selectedPeriods, selectedWeek);
 
   return (
     <article className="group relative">
       <button
-        className="card block w-full p-4 pr-11 text-left transition-all duration-150 group-hover:border-primary-300 group-hover:shadow-md"
+        className="card block w-full p-4 pr-11 text-left transition-all duration-150 group-hover:border-primary-300 group-hover:shadow-md active:scale-[0.98]"
         onClick={() => onOpen(room)}
         type="button"
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium",
               occupied.length ? "bg-danger-50 text-danger-600" : "bg-success-50 text-success-700",
             )}
           >
             <span className={cn("h-1.5 w-1.5 rounded-full", occupied.length ? "bg-danger-500" : "bg-success-500")} />
             {occupied.length ? "占用" : "空闲"}
           </span>
+          {attribute ? (
+            <span
+              className={cn(
+                "min-w-0 truncate rounded-full border border-white/70 px-2 py-0.5 text-[11px] font-medium",
+                ATTRIBUTE_TONES[attribute.tone] ?? ATTRIBUTE_TONES.gray,
+              )}
+              title={attribute.detail || attribute.label}
+            >
+              {attribute.label}
+            </span>
+          ) : null}
         </div>
         <div className="mt-2.5 truncate text-[15px] font-semibold tracking-tight text-gray-900">{room.name}</div>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
@@ -48,7 +68,7 @@ export function RoomCard({
       </button>
       <button
         className={cn(
-          "absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-150",
+          "absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-150 active:scale-[0.85]",
           isFavorite ? "text-danger-500 hover:bg-danger-50" : "text-gray-300 hover:bg-gray-100 hover:text-danger-400",
         )}
         onClick={() => onToggleFavorite(room.name)}
@@ -56,7 +76,7 @@ export function RoomCard({
         aria-label={isFavorite ? `取消收藏 ${room.name}` : `收藏 ${room.name}`}
         title={isFavorite ? "取消收藏" : "收藏教室"}
       >
-        <Heart size={15} fill={isFavorite ? "currentColor" : "none"} />
+        <Heart key={isFavorite ? "on" : "off"} size={15} fill={isFavorite ? "currentColor" : "none"} className={cn(isFavorite && "animate-pop")} />
       </button>
     </article>
   );
@@ -107,7 +127,7 @@ export function EntityResultCard({ view, label, entries, eventCount, onOpen }) {
 
   return (
     <button
-      className="card group flex w-full items-center gap-3.5 p-4 text-left transition-all duration-150 hover:border-primary-300 hover:shadow-md"
+      className="card group flex w-full items-center gap-3.5 p-4 text-left transition-all duration-150 hover:border-primary-300 hover:shadow-md active:scale-[0.99]"
       onClick={() => onOpen(view, label)}
       type="button"
     >

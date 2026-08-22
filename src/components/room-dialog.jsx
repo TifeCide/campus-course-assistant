@@ -42,24 +42,24 @@ export function RoomDialog({
   if (!scheduleReady) {
     return (
       <>
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur-sm">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <DetailBackButton canGoBack={canGoBack} depth={backDepth} onBack={onBack} />
-              <div className="text-[11px] font-medium tracking-wide text-gray-400">教室详情</div>
-            </div>
-            <h2 className="mt-1 truncate text-xl font-semibold tracking-tight text-gray-900">{room.name}</h2>
-            <p className="mt-0.5 inline-flex items-center gap-1 text-[13px] text-gray-500">
-              <MapPin size={13} className="text-gray-400" />
-              {room.building} · {room.floor} 层 · {room.zone.replace("普通教学区", "教学区")}
-            </p>
+      <div className="sticky top-0 z-40 flex items-start justify-between gap-3 border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur-sm">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <DetailBackButton canGoBack={canGoBack} depth={backDepth} onBack={onBack} />
+            <div className="text-[11px] font-medium tracking-wide text-gray-400">教室详情</div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button className="icon-btn" onClick={onClose} type="button" aria-label="关闭">
-              <X size={18} />
-            </button>
-          </div>
+          <h2 className="mt-1 truncate text-xl font-semibold tracking-tight text-gray-900">{room.name}</h2>
+          <p className="mt-0.5 inline-flex items-center gap-1 text-[13px] text-gray-500">
+            <MapPin size={13} className="text-gray-400" />
+            {room.building} · {room.floor} 层 · {room.zone.replace("普通教学区", "教学区")}
+          </p>
         </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button className="icon-btn" onClick={onClose} type="button" aria-label="关闭">
+            <X size={18} />
+          </button>
+        </div>
+      </div>
         <div className="m-5 flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 px-6 py-16 text-center">
           <LoaderCircle size={24} className="loading-spinner animate-spin text-primary-500" />
           <h3 className="mt-3 text-base font-semibold text-gray-900">{scheduleError ? "课表加载失败" : "正在加载完整课表"}</h3>
@@ -78,7 +78,7 @@ export function RoomDialog({
 
   return (
     <>
-      <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur-sm">
+      <div className="sticky top-0 z-40 flex items-start justify-between gap-3 border-b border-gray-100 bg-white/95 px-5 py-4 backdrop-blur-sm">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <DetailBackButton canGoBack={canGoBack} depth={backDepth} onBack={onBack} />
@@ -101,7 +101,7 @@ export function RoomDialog({
             aria-label={isFavorite ? "取消收藏" : "收藏教室"}
             title={isFavorite ? "取消收藏" : "收藏教室"}
           >
-            <Heart size={17} fill={isFavorite ? "currentColor" : "none"} />
+            <Heart key={isFavorite ? "on" : "off"} size={17} fill={isFavorite ? "currentColor" : "none"} className={cn(isFavorite && "animate-pop")} />
           </button>
           <button className="icon-btn" onClick={onClose} type="button" aria-label="关闭">
             <X size={18} />
@@ -110,7 +110,7 @@ export function RoomDialog({
       </div>
 
       <div className="space-y-4 px-5 py-4">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="relative z-30 grid animate-slide-up grid-cols-3 gap-2">
           <div className="rounded-lg bg-gray-50 px-3 py-2">
             <span className="block text-[11px] text-gray-500">当前周次</span>
             <strong className="block text-sm font-semibold text-gray-900">第 {selectedWeek} 周</strong>
@@ -131,9 +131,10 @@ export function RoomDialog({
 
         <div
           className={cn(
-            "flex items-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-medium",
+            "relative z-20 flex animate-slide-up items-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-medium",
             occupied.length ? "bg-warning-50 text-warning-700" : "bg-success-50 text-success-700",
           )}
+          style={{ animationDelay: "60ms" }}
         >
           {occupied.length ? (
             <BookOpen size={15} className="shrink-0" />
@@ -147,7 +148,7 @@ export function RoomDialog({
           </span>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="relative z-10 grid animate-slide-up gap-3 md:grid-cols-2" style={{ animationDelay: "100ms" }}>
           <section className="rounded-xl border border-gray-200 p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -202,7 +203,8 @@ export function RoomDialog({
           </section>
         </div>
 
-        <p className="mb-1.5 text-right text-[10px] text-gray-300 sm:hidden">← 左右滑动查看整周课表 →</p>
+        <div className="animate-slide-up" style={{ animationDelay: "140ms" }}>
+          <p className="mb-1.5 text-right text-[10px] text-gray-300 sm:hidden">← 左右滑动查看整周课表 →</p>
         <div className="overflow-x-auto">
           <div className="min-w-[740px] overflow-hidden rounded-xl border border-gray-200">
             <div className={cn("grid bg-gray-50/80", SCHEDULE_GRID_COLS)}>
@@ -215,12 +217,11 @@ export function RoomDialog({
             </div>
           {data.timeSlots.map((slot) => (
             <div className={cn("grid border-t border-gray-100", SCHEDULE_GRID_COLS)} key={slot.code}>
-              <div className="flex flex-col justify-center border-r border-gray-100 bg-gray-50/60 px-2 py-1.5">
-                <strong className="text-[11px] font-semibold text-gray-700">{slot.label}</strong>
-                <span className="text-[10px] tabular-nums text-gray-400">
-                  {slot.start} - {slot.end}
-                </span>
-              </div>
+                <div className="flex flex-col justify-center border-r border-gray-100 bg-gray-50/60 px-2 py-1.5">
+                  <strong className="text-[11px] font-semibold text-gray-700">{slot.label}</strong>
+                  <span className="block text-[10px] leading-snug tabular-nums text-gray-400">&nbsp;{slot.start}</span>
+                  <span className="block text-[10px] leading-snug tabular-nums text-gray-400">&nbsp;{slot.end}</span>
+                </div>
               {data.weekdays.map((day) => {
                 const entries = getRoomEntries(room, day.index, slot.code, selectedWeek);
                 return (
@@ -266,6 +267,7 @@ export function RoomDialog({
             </div>
           ))}
           </div>
+        </div>
         </div>
       </div>
     </>

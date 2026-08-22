@@ -85,6 +85,7 @@ import {
   EmptyState,
   Modal,
   MultiSelectField,
+  SegmentedThumb,
   StatCard,
   Toggle,
 } from "./components/ui";
@@ -103,6 +104,7 @@ function App() {
   const [data, setData] = useState(null);
   const [scheduleData, setScheduleData] = useState(null);
   const [directoryData, setDirectoryData] = useState(null);
+  const [roomAttributeData, setRoomAttributeData] = useState(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [lazyLoadError, setLazyLoadError] = useState("");
   const [loadError, setLoadError] = useState("");
@@ -130,7 +132,7 @@ function App() {
   const [commandQuery, setCommandQuery] = useState("");
   const [favorites, setFavorites] = useFavorites();
   const [recentQueries, saveRecentQuery] = useRecentQueries();
-  const [showBackToFilters, setShowBackToFilters] = useState(false);
+  const [backToFiltersState, setBackToFiltersState] = useState("hidden");
   const [urlInitialized, setUrlInitialized] = useState(false);
   const autoInitialized = useRef(false);
   const currentNow = useClock();
@@ -193,6 +195,11 @@ function App() {
         setLoadNotice("");
         setLoadProgress(0);
         setLoadStage("正在加载：数据版本 0%、公共字典 0%、教室信息 0%、占用索引 0%、设置 0%");
+
+        /* 教室属性徽章为可选外挂数据：不阻塞首屏，缺失或加载失败时静默降级为无徽章。 */
+        fetchJsonFromUrls(getV2ResourceUrls("data/room-attributes.json"))
+          .then((value) => setRoomAttributeData(value && typeof value === "object" ? value : {}))
+          .catch(() => setRoomAttributeData({}));
 
         const manifestValue = await loadResource("manifest", V2_MANIFEST_URLS);
         const getManifestUrls = (key) => {
@@ -345,6 +352,34 @@ function App() {
   const resultsSectionRef = useRef(null);
   const resultsZoneRef = useRef(false);
   const lastScrollYRef = useRef(0);
+  const backToFiltersStateRef = useRef("hidden");
+  const backToFiltersTimerRef = useRef(0);
+
+  /* 「返回筛选」提示条的状态机：shown 为常驻显示，leaving 播放上滑淡出过渡后再卸载： */
+  function transitionBackToFilters(next) {
+    const current = backToFiltersStateRef.current;
+    if (current === next) return;
+    window.clearTimeout(backToFiltersTimerRef.current);
+
+    if (next === "shown") {
+      backToFiltersStateRef.current = "shown";
+      setBackToFiltersState("shown");
+      return;
+    }
+
+    if (current === "shown") {
+      backToFiltersStateRef.current = "leaving";
+      setBackToFiltersState("leaving");
+      backToFiltersTimerRef.current = window.setTimeout(() => {
+        backToFiltersStateRef.current = "hidden";
+        setBackToFiltersState("hidden");
+      }, 200);
+      return;
+    }
+
+    backToFiltersStateRef.current = "hidden";
+    setBackToFiltersState("hidden");
+  }
 
   useEffect(() => {
     const handlePopState = (event) => {
@@ -491,10 +526,10 @@ function App() {
         const inDeepZone = resultsSection.getBoundingClientRect().top < 240;
         const scrollingDown = scrollTop - lastScrollYRef.current > 0;
         if (inDeepZone && scrollingDown && !resultsZoneRef.current) {
-          setShowBackToFilters(true);
+          transitionBackToFilters("shown");
         }
         if (!inDeepZone && scrollTop < 300) {
-          setShowBackToFilters(false);
+          transitionBackToFilters("hidden");
         }
         resultsZoneRef.current = inDeepZone;
       }
@@ -536,6 +571,15 @@ function App() {
   );
 
   const roomByName = useMemo(() => new Map((data?.rooms ?? []).map((room) => [room.name, room])), [data]);
+  const attributeByName = useMemo(() => {
+    const entries = roomAttributeData?.attributes;
+    if (!entries || typeof entries !== "object") return null;
+    return new Map(
+      Object.entries(entries)
+        .filter(([, value]) => value && typeof value === "object" && typeof value.label === "string" && value.label)
+        .map(([name, value]) => [String(name), value]),
+    );
+  }, [roomAttributeData]);
   const courseResults = useMemo(() => {
     if (!data || !scheduleData) return [];
     const normalizedQuery = query.trim().toLowerCase();
@@ -679,6 +723,7 @@ function App() {
     );
   }, [data, querySnapshot, urlInitialized]);
 
+  /*当 URL 查询状态稳定保持 5 秒后，才把当前快照写入最近查看，避免路过性查询污染记录： */
   useEffect(() => {
     if (!urlInitialized) return undefined;
 
@@ -686,7 +731,7 @@ function App() {
 
     const timer = window.setTimeout(() => {
       saveRecentQuery(querySnapshot);
-    }, 650);
+    }, 5000);
 
     return () => window.clearTimeout(timer);
   }, [activeView, querySnapshot, saveRecentQuery, urlInitialized]);
@@ -828,8 +873,9 @@ function App() {
     replaceDetailHistoryState(nextStack);
   }
 
-  /*平滑滚动返回筛选面板位置： */
+  /*平滑滚动返回筛选面板位置，并立即收回提示条： */
   function scrollBackToFilters() {
+    transitionBackToFilters("hidden");
     const panel = queryPanelRef.current;
     if (!panel) return;
     const rect = panel.getBoundingClientRect();
@@ -1011,13 +1057,14 @@ function App() {
 
         <section ref={queryPanelRef} className="mt-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex gap-0.5 rounded-lg bg-gray-100 p-1">
+            <div className="relative flex gap-0.5 rounded-lg bg-gray-100 p-1">
+              <SegmentedThumb count={VIEW_TABS.length} index={Math.max(0, VIEW_TABS.findIndex((tab) => tab.view === activeView))} />
               {VIEW_TABS.map(({ view, label, icon: Icon }) => (
                 <button
                   key={view}
                   className={cn(
-                    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all duration-150",
-                    activeView === view ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-800",
+                    "relative z-10 inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors duration-150 active:scale-[0.96]",
+                    activeView === view ? "text-gray-900" : "text-gray-500 hover:text-gray-800",
                   )}
                   onClick={() => changeView(view)}
                   type="button"
@@ -1153,10 +1200,13 @@ function App() {
           </div>
           </section>
 
-          {showBackToFilters ? (
+          {backToFiltersState !== "hidden" ? (
             <div className="pointer-events-none fixed inset-x-0 top-[84px] z-20 flex justify-center px-4">
               <button
-                className="pointer-events-auto flex h-9 animate-slide-down items-center gap-1.5 rounded-full border border-white/60 bg-white/95 pl-3.5 pr-3 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-md transition-colors duration-150 hover:text-primary-700"
+                className={cn(
+                  "pointer-events-auto flex h-9 items-center gap-1.5 rounded-full border border-white/60 bg-white/95 pl-3.5 pr-3 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-md transition-all duration-200 hover:text-primary-700 active:scale-[0.97]",
+                  backToFiltersState === "leaving" ? "-translate-y-2 opacity-0" : "animate-slide-down",
+                )}
                 onClick={scrollBackToFilters}
                 type="button"
               >
@@ -1175,7 +1225,7 @@ function App() {
             <div className="mt-2.5 flex flex-wrap gap-2">
               {favoriteRooms.map((room) => (
                 <button
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-left transition-all duration-150 hover:border-primary-300 hover:bg-primary-50/60"
+                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-left transition-all duration-150 hover:border-primary-300 hover:bg-primary-50/60 active:scale-[0.97]"
                   key={room.name}
                   onClick={() => openRoom(room)}
                   type="button"
@@ -1197,7 +1247,7 @@ function App() {
             <div className="mt-2.5 flex flex-wrap gap-2">
               {recentQueries.map((snapshot, index) => (
                 <button
-                  className="max-w-full truncate rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 transition-colors duration-150 hover:border-gray-300 hover:bg-gray-50"
+                  className="max-w-full truncate rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 transition-all duration-150 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.97]"
                   key={`${JSON.stringify(snapshot)}-${index}`}
                   onClick={() => applyRecentQuery(snapshot)}
                   type="button"
@@ -1211,7 +1261,7 @@ function App() {
         ) : null}
 
         <section ref={resultsSectionRef} className="relative mt-5">
-          <div className="results-content">
+          <div key={activeView} className="animate-slide-up">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="min-w-0">
                 <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-600">
@@ -1241,7 +1291,7 @@ function App() {
               </div>
               {activeView === "available" ? (
                 <div className="text-right">
-                  <strong className="block text-2xl font-bold tabular-nums tracking-tight text-gray-900">{displayRooms.length}</strong>
+                  <strong key={displayRooms.length} className="block animate-fade-in text-2xl font-bold tabular-nums tracking-tight text-gray-900">{displayRooms.length}</strong>
                   <span className="text-xs text-gray-400">/ {filteredRooms.length} 间{onlyAvailable ? "空闲" : ""}</span>
                 </div>
               ) : null}
@@ -1276,17 +1326,23 @@ function App() {
                               <span className="text-gray-400">{floorGroup.rooms.length} 间</span>
                             </div>
                             <div className="mt-2 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4">
-                              {floorGroup.rooms.map((room) => (
-                                <RoomCard
+                              {floorGroup.rooms.map((room, roomIndex) => (
+                                <div
                                   key={room.name}
-                                  room={room}
-                                  onOpen={openRoom}
-                                  selectedWeek={selectedWeek}
-                                  selectedWeekday={selectedWeekday}
-                                  selectedPeriods={selectedPeriods}
-                                  isFavorite={favoriteSet.has(room.name)}
-                                  onToggleFavorite={toggleFavorite}
-                                />
+                                  className="animate-slide-up"
+                                  style={{ animationDelay: `${Math.min(roomIndex * 40, 240)}ms` }}
+                                >
+                                  <RoomCard
+                                    room={room}
+                                    onOpen={openRoom}
+                                    selectedWeek={selectedWeek}
+                                    selectedWeekday={selectedWeekday}
+                                    selectedPeriods={selectedPeriods}
+                                    isFavorite={favoriteSet.has(room.name)}
+                                    onToggleFavorite={toggleFavorite}
+                                    attribute={attributeByName?.get(room.name)}
+                                  />
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -1303,15 +1359,16 @@ function App() {
             ) : (
               <div className="mt-4 space-y-2.5">
                 {visibleEntityCards.length ? (
-                  visibleEntityCards.slice(0, settings.searchResultLimit).map(({ label, entries, eventCount }) => (
-                    <EntityResultCard
-                      key={label}
-                      view={activeView}
-                      label={label}
-                      entries={entries}
-                      eventCount={eventCount}
-                      onOpen={openEntityCard}
-                    />
+                  visibleEntityCards.slice(0, settings.searchResultLimit).map(({ label, entries, eventCount }, index) => (
+                    <div key={label} className="animate-slide-up" style={{ animationDelay: `${Math.min(index * 30, 240)}ms` }}>
+                      <EntityResultCard
+                        view={activeView}
+                        label={label}
+                        entries={entries}
+                        eventCount={eventCount}
+                        onOpen={openEntityCard}
+                      />
+                    </div>
                   ))
                 ) : (
                   <DirectoryEmptyState view={activeView} hasQuery={Boolean(query)} onReset={() => setQuery("")} />
@@ -1441,7 +1498,7 @@ function App() {
       {settings.enableBackToTop ? (
         <button
           className={cn(
-            "fixed right-5 bottom-5 z-30 h-11 w-11 rounded-full p-[2px] shadow-lg transition-all duration-200",
+            "fixed right-5 bottom-5 z-30 h-11 w-11 rounded-full p-[2px] shadow-lg transition-all duration-200 active:scale-[0.92]",
             scrollProgress > 0.02 ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0",
           )}
           type="button"
@@ -1461,7 +1518,7 @@ function App() {
 
       <button
         className={cn(
-          "fixed right-5 bottom-[4.75rem] z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/70 text-primary-600 shadow-lg backdrop-blur-md transition-all duration-200 hover:bg-white/90",
+          "fixed right-5 bottom-[4.75rem] z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/70 text-primary-600 shadow-lg backdrop-blur-md transition-all duration-200 hover:bg-white/90 active:scale-[0.92]",
           showResultsJump ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0",
         )}
         type="button"

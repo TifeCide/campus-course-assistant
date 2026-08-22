@@ -39,15 +39,15 @@ export function LoadingScreen({ progress, stage, notice }) {
         ) : null}
 
         <div className="mt-6 grid grid-cols-2 gap-2.5">
-          <span className="h-16 animate-pulse rounded-xl bg-gray-100" />
-          <span className="h-16 animate-pulse rounded-xl bg-gray-100" />
-          <span className="h-16 animate-pulse rounded-xl bg-gray-100" />
-          <span className="h-16 animate-pulse rounded-xl bg-gray-100" />
+          <span className="skeleton h-16 rounded-xl" />
+          <span className="skeleton h-16 rounded-xl" />
+          <span className="skeleton h-16 rounded-xl" />
+          <span className="skeleton h-16 rounded-xl" />
         </div>
         <div className="mt-2.5 space-y-2.5">
-          <span className="block h-10 animate-pulse rounded-xl bg-gray-100" />
-          <span className="block h-10 animate-pulse rounded-xl bg-gray-100" />
-          <span className="block h-10 animate-pulse rounded-xl bg-gray-100" />
+          <span className="skeleton block h-10 rounded-xl" />
+          <span className="skeleton block h-10 rounded-xl" />
+          <span className="skeleton block h-10 rounded-xl" />
         </div>
       </div>
     </main>

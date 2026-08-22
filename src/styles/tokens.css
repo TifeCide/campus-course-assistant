@@ -56,6 +56,7 @@
   --animate-dialog-out: dialog-out 150ms ease both;
   --animate-slide-up: slide-up 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-slide-down: slide-down 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pop: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -80,6 +81,11 @@
   @keyframes slide-down {
     from { opacity: 0; transform: translateY(-16px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.35); }
+    100% { transform: scale(1); }
   }
 }
 
@@ -136,7 +142,7 @@
   .btn-primary,
   .btn-outline,
   .btn-ghost {
-    @apply inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap shadow-xs transition-colors duration-150;
+    @apply inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-lg px-3.5 text-sm font-medium whitespace-nowrap shadow-xs transition duration-150 active:scale-[0.97];
   }
 
   .btn-primary {
@@ -152,7 +158,7 @@
   }
 
   .icon-btn {
-    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-800;
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 transition duration-150 hover:bg-gray-100 hover:text-gray-800 active:scale-[0.9];
   }
 
   .field-input {
@@ -161,5 +167,24 @@
 
   .card {
     @apply rounded-xl border border-gray-200 bg-white shadow-xs;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden bg-gray-100;
+  }
+
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 65%), transparent);
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
