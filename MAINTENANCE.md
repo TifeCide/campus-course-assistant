@@ -149,7 +149,12 @@ npm run build
 
 | 文件 | 作用 |
 | --- | --- |
-| `src/App.jsx` | 页面组件、筛选逻辑、数据加载、收藏和最近查询 |
+| `src/App.jsx` | 应用主组件：数据加载编排、筛选逻辑与页面组合 |
+| `src/config.js` | 多源资源地址、加载进度估算和构建时间 |
+| `src/constants.js` | 默认设置与存储键等常量 |
+| `src/components/` | 可复用 UI 组件（ui、pickers、cards、room-dialog、entity-schedule、notifications 等） |
+| `src/hooks/` | useClock、useFavorites、useRecentQueries 状态钩子 |
+| `src/utils/` | 时间日期、教室占用、查询快照、v2 数据转换、通知归一化等纯函数 |
 | `src/styles.css` | 全部页面样式、响应式布局和深色模式 |
 | `src/main.jsx` | React 应用入口 |
 | `public/data/v2/` | 前端实际读取的模块化数据 |

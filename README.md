@@ -107,9 +107,14 @@ npm run update-data
 │  ├─ parse-schedule.js                 （旧版）课程、教师和班级索引解析器，回退用
 │  └─ build-data-v2.js                  （旧版）v2 数据构建器，回退用
 ├─ src/
-│  ├─ App.jsx                           页面组件和主要业务逻辑
+│  ├─ App.jsx                           应用主组件：数据加载编排、筛选逻辑与页面组合
 │  ├─ main.jsx                          React 应用入口
-│  └─ styles.css                        全部页面样式
+│  ├─ styles.css                        全部页面样式
+│  ├─ config.js                         多源资源地址、加载进度估算和构建时间
+│  ├─ constants.js                      默认设置与存储键等常量
+│  ├─ components/                       可复用 UI 组件（对话框、卡片、选择器、通知等）
+│  ├─ hooks/                            useClock、useFavorites、useRecentQueries 等状态钩子
+│  └─ utils/                            时间、教室占用、查询快照、v2 数据转换等纯函数
 ├─ CNAME                                GitHub Pages 自定义域名
 ├─ index.html                           HTML 入口
 ├─ package.json                         脚本和依赖配置
@@ -292,7 +297,7 @@ public/data/setting.json
 
 配置优先级与容错：
 
-1. 代码内置默认值（`src/App.jsx` 的 `DEFAULT_SETTINGS`）
+1. 代码内置默认值（`src/constants.js` 的 `DEFAULT_SETTINGS`）
 2. `public/data/setting.json`（运行时覆盖默认值）
 3. URL 查询参数（仅覆盖查询条件，不覆盖站点设置项）
 
@@ -342,7 +347,7 @@ public/data/setting.json
 
 新增配置字段时，应同步修改：
 
-1. `src/App.jsx` 中的 `DEFAULT_SETTINGS`。
+1. `src/constants.js` 中的 `DEFAULT_SETTINGS`。
 2. 设置加载时的类型归一化逻辑。
 3. 实际读取该配置的组件或业务逻辑。
 4. 本 README 的配置表。
@@ -456,19 +461,22 @@ VITE_BASE_PATH=/your-path/ npm run build
 
 ## 修改代码时的入口
 
-主要业务逻辑集中在 `src/App.jsx`：
+应用主组件在 `src/App.jsx`，负责数据加载编排、筛选逻辑与页面组合；其余逻辑按职责拆分到各模块：
 
-| 区域 | 主要内容 |
-| --- | --- |
-| 日期和周次函数 | `getAcademicWeek`、`getAcademicPhase`、`getRoomDateValue`、`getTemporalFromDate` |
-| 数据加载 | `fetchJsonWithProgress`、`fetchJsonFromUrls` 及 `App` 内的资源加载逻辑 |
-| 加载进度 | `getOverallLoadProgress` 和 `LOAD_RESOURCE_SIZE_ESTIMATES` |
-| 空闲教室筛选 | `getRoomEntries`、`getRoomEntriesForPeriods`、`filteredRooms`、`availableRooms` |
-| 课程检索 | `courseResults` 及 `CommandDialog` |
-| 教室卡片和详情 | `RoomCard`、`RoomDialog` |
-| 时间选择 | `TemporalPicker`、`PeriodPicker` |
-| 通知 | `normalizeNotification`、`NotificationCenter`、`NotificationCenterDialog` |
-| URL 和最近查询 | `createQuerySnapshot`、`getQuerySnapshotFromUrl`、`getQueryUrl` |
+| 区域 | 主要内容 | 所在文件 |
+| --- | --- | --- |
+| 日期和周次函数 | `getAcademicWeek`、`getAcademicPhase`、`getRoomDateValue`、`getTemporalFromDate` | `src/utils/datetime.js` |
+| 数据加载 | `fetchJsonWithProgress`、`fetchJsonFromUrls` 及 `App` 内的资源加载逻辑 | `src/utils/fetch.js`、`src/App.jsx`、`src/config.js` |
+| 加载进度 | `getOverallLoadProgress` 和 `LOAD_RESOURCE_SIZE_ESTIMATES` | `src/config.js` |
+| v2 数据转换 | `createInitialDataFromV2`、`createScheduleDataFromV2`、`hydrateRoomsWithSchedule` | `src/utils/v2data.js` |
+| 空闲教室筛选 | `getRoomEntries`、`getRoomEntriesForPeriods`、`filteredRooms`、`availableRooms` | `src/utils/rooms.js`、`src/App.jsx` |
+| 课程检索 | `courseResults` 及 `CommandDialog` | `src/App.jsx`、`src/components/command-dialog.jsx` |
+| 教室卡片和详情 | `RoomCard`、`RoomDialog` | `src/components/cards.jsx`、`src/components/room-dialog.jsx` |
+| 实体课表 | `EntityScheduleDialog`、`EntityScheduleCell`、`SchedulePreviewPopover` | `src/components/entity-schedule.jsx` |
+| 时间选择 | `TemporalPicker`、`PeriodPicker` | `src/components/pickers.jsx` |
+| 通知 | `normalizeNotification`、`NotificationCenter`、`NotificationCenterDialog` | `src/utils/notifications.js`、`src/components/notifications.jsx` |
+| URL 和最近查询 | `createQuerySnapshot`、`getQuerySnapshotFromUrl`、`getQueryUrl` | `src/utils/query.js`、`src/hooks/useRecentQueries.js` |
+| 收藏与时钟 | `useFavorites`、`useClock` | `src/hooks/` |
 
 修改筛选、时间或数据结构后，至少运行：
 

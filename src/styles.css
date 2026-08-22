@@ -2703,7 +2703,7 @@ input {
 }
 
 .dialog {
-  width: min(1120px, 100%);
+  width: min(1180px, 100%);
   max-height: min(90vh, 980px);
   overflow: auto;
   overscroll-behavior-y: contain;
@@ -2720,10 +2720,6 @@ input {
 
 .dialog-room {
   padding: 24px;
-}
-
-.dialog-entity {
-  width: min(1180px, 100%);
 }
 
 .dialog-command {
