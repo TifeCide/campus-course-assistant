@@ -9,8 +9,8 @@
 系统运行时从以下文件读取数据：
 
 ```text
-public/data/classroom-data.json
 public/data/setting.json
+public/data/v2/
 ```
 
 不需要后端服务，也不需要鉴权。
@@ -56,7 +56,7 @@ kbxx_classroom_ifr_2026-2027-1.html
 然后执行：
 
 ```bash
-npm run parse
+npm run build-data
 ```
 
 PowerShell 中先设置：
@@ -65,24 +65,27 @@ PowerShell 中先设置：
 $env:SCHEDULE_SOURCE_DIR = ".source-data"
 ```
 
-解析器会自动查找该目录中名称匹配以下格式的文件：
+构建器会自动查找该目录中名称匹配以下格式的文件：
 
 ```text
 kbxx_classroom_ifr_*.html
+kbxx_kc_ifr_*.html
+kbxx_teacher_ifr_*.html
+kbxx_xzb_ifr_*.html
 ```
 
-默认使用文件名排序后最新的文件，并生成：
+每类文件默认使用文件名排序后最新的文件，并直接生成：
 
 ```text
-public/data/classroom-data.json
+public/data/v2/
 ```
 
 ### 指定课表文件
 
-如果根目录中有多个课表文件，可以手动指定：
+如果课表目录中有多个教室课表文件，可以手动指定教室课表：
 
 ```bash
-npm run parse -- kbxx_classroom_ifr_2026-2027-1.html
+npm run build-data -- kbxx_classroom_ifr_2026-2027-1.html
 ```
 
 ### 解析并重新构建
@@ -95,9 +98,8 @@ npm run update-data
 
 该命令会依次执行：
 
-1. 解析 HTML 课表。
-2. 生成旧版兼容数据和 `public/data/v2/` 模块化数据。
-3. 执行 `npm run build`。
+1. 解析四份 HTML 课表并生成 `public/data/v2/` 模块化数据。
+2. 执行 `npm run build`。
 
 生成后执行：
 
@@ -105,9 +107,9 @@ npm run update-data
 npm run verify-data-v2
 ```
 
-该校验会比对全部 756 个周次、星期和节次占用结果，并验证目录索引与 manifest。
+该校验会从课程事件重建全部 756 个周次、星期和节次占用结果并与 `availability.json` 比对，同时验证 manifest 哈希与目录索引。
 
-解析成功后会输出教室数量、课程记录数量和最大周次。
+解析成功后会输出教室数量、课程记录数量、最大周次和 v2 各文件的统计与校验计数。
 
 ## 4. 配置文件
 
@@ -150,13 +152,14 @@ npm run build
 | `src/App.jsx` | 页面组件、筛选逻辑、数据加载、收藏和最近查询 |
 | `src/styles.css` | 全部页面样式、响应式布局和深色模式 |
 | `src/main.jsx` | React 应用入口 |
-| `public/data/classroom-data.json` | 兼容解析产物和 v2 校验基准 |
 | `public/data/v2/` | 前端实际读取的模块化数据 |
 | `public/data/setting.json` | 网站行为配置 |
-| `scripts/parse-classrooms.js` | HTML 课表解析器 |
-| `scripts/build-data-v2.js` | v2 规范化数据构建器 |
+| `scripts/build-data.js` | 课表 HTML 解析与 v2 数据构建的统一入口 |
 | `scripts/verify-data-v2.js` | v2 一致性校验 |
 | `scripts/class-normalization.json` | 班级别名和拆分配置 |
+| `scripts/parse-classrooms.js` | （旧版）教室课表解析器，回退用 |
+| `scripts/parse-schedule.js` | （旧版）课程、教师和班级索引解析器，回退用 |
+| `scripts/build-data-v2.js` | （旧版）v2 数据构建器，回退用 |
 | `package.json` | 项目命令和依赖配置 |
 | `dist/` | 生产构建输出目录 |
 
@@ -179,7 +182,7 @@ npm run build
 Could not find #kbtable in source HTML.
 ```
 
-课程时间段目前由 `scripts/parse-classrooms.js` 中的 `TIME_SLOT_MAP` 定义。如果教务系统增加或修改节次，需要同步修改该映射。
+课程时间段目前由 `scripts/build-data.js` 中的 `TIME_SLOT_MAP` 定义。如果教务系统增加或修改节次，需要同步修改该映射。
 
 ## 7. 前端本地数据
 
@@ -240,16 +243,16 @@ npm run update-data
 
 如果网页仍显示旧课表，依次检查：
 
-1. `public/data/classroom-data.json` 是否已经更新。
-2. `dist/data/classroom-data.json` 是否已经更新。
+1. `public/data/v2/` 是否已经更新。
+2. `dist/data/v2/` 是否已经更新。
 3. 浏览器是否需要强制刷新。
 4. 静态服务器是否缓存了旧 JSON。
 
 生产服务器建议为以下 JSON 文件设置较短缓存时间或使用重新部署后的缓存刷新策略：
 
 ```text
-/data/classroom-data.json
 /data/setting.json
+/data/v2/manifest.json
 ```
 
 ## 10. 快速更新清单
@@ -260,7 +263,7 @@ npm run update-data
 1. 将新的 kbxx_classroom_ifr_*.html、kbxx_kc_ifr_*.html、kbxx_teacher_ifr_*.html 和 kbxx_xzb_ifr_*.html 放到 `.source-data/`。
 2. 执行 npm run update-data。
 3. 执行 npm run verify-data-v2。
-4. 检查解析输出的教室数量和课程数量。
+4. 检查构建输出的教室数量、课程事件数量和 v2 统计。
 5. 部署 dist/ 目录。
 6. 浏览器强制刷新并检查当前学期起始日期配置。
 ```

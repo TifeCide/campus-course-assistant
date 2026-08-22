@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "build-data": "node scripts/build-data.js",
     "parse": "node scripts/parse-classrooms.js",
     "parse-schedule": "node scripts/parse-schedule.js",
     "build-data-v2": "node scripts/build-data-v2.js",
     "verify-data-v2": "node scripts/verify-data-v2.js",
-    "update-data": "npm run parse && npm run parse-schedule && npm run build-data-v2 && npm run build",
+    "update-data": "npm run build-data && npm run build",
     "build": "vite build",
     "preview": "vite preview"
   },

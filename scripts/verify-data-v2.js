@@ -5,8 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, "..");
-const DATA_DIR = path.resolve(PROJECT_ROOT, "public", "data");
-const V2_DIR = path.resolve(DATA_DIR, "v2");
+const V2_DIR = path.resolve(PROJECT_ROOT, "public", "data", "v2");
+
+const ROOM_SOURCE_BIT = 1;
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -53,23 +54,34 @@ function verifyManifest(manifest) {
   }
 }
 
-function verifyAvailability(legacy, rooms, availability) {
-  const roomIdByName = new Map(rooms.rooms.map((room) => [room.name, room.id]));
-  let checkedSlots = 0;
+function verifyAvailabilityFromEvents(availability, rooms, events, maxWeek) {
+  assert(availability.roomCount === rooms.rooms.length, "Availability room count mismatch");
+  assert(
+    availability.weeks.length === maxWeek,
+    `Availability week count mismatch: ${availability.weeks.length} != ${maxWeek}`,
+  );
 
-  for (let week = 1; week <= legacy.summary.maxWeek; week += 1) {
-    for (let weekday = 1; weekday <= legacy.weekdays.length; weekday += 1) {
-      for (let period = 0; period < legacy.timeSlots.length; period += 1) {
-        const periodCode = legacy.timeSlots[period].code;
-        const expected = legacy.rooms
-          .filter((room) => (room.slots[String(weekday)]?.[periodCode] ?? [])
-            .some((entry) => entry.weeks.includes(week)))
-          .map((room) => roomIdByName.get(room.name))
-          .sort((left, right) => left - right);
+  const expected = availability.weeks.map((days) =>
+    days.map((periods) => periods.map(() => new Set())),
+  );
+
+  events.forEach((event) => {
+    const [roomId, , , , weekday, period, weekMask, , sourceMask] = event;
+    if (roomId < 0 || !(sourceMask & ROOM_SOURCE_BIT)) return;
+    for (let week = 1; week <= maxWeek; week += 1) {
+      if (weekMask & (1 << (week - 1))) expected[week - 1][weekday][period].add(roomId);
+    }
+  });
+
+  let checkedSlots = 0;
+  for (let week = 1; week <= maxWeek; week += 1) {
+    for (let weekday = 1; weekday <= availability.weeks[week - 1].length; weekday += 1) {
+      for (let period = 0; period < availability.weeks[week - 1][weekday - 1].length; period += 1) {
         const actual = availability.weeks[week - 1][weekday - 1][period];
+        const rebuilt = [...expected[week - 1][weekday - 1][period]].sort((left, right) => left - right);
         assert(
-          compareNumericArrays(expected, actual),
-          `Availability mismatch: week=${week}, weekday=${weekday}, period=${periodCode}`,
+          compareNumericArrays(rebuilt, actual),
+          `Availability mismatch: week=${week}, weekday=${weekday}, period=${period}`,
         );
         checkedSlots += 1;
       }
@@ -118,7 +130,6 @@ function verifyDirectory(directory, events, common) {
 }
 
 function main() {
-  const legacy = readJson(path.resolve(DATA_DIR, "classroom-data.json"));
   const manifest = readJson(path.resolve(V2_DIR, "manifest.json"));
   const common = readJson(path.resolve(V2_DIR, "common.json"));
   const rooms = readJson(path.resolve(V2_DIR, "rooms.json"));
@@ -144,7 +155,8 @@ function main() {
     classIds.forEach((id) => assert(id >= 0 && id < common.classes.length, `Invalid class ID in event ${eventId}`));
   });
 
-  const checkedSlots = verifyAvailability(legacy, rooms, availability);
+  const maxWeek = manifest.summary?.maxWeek ?? availability.weeks.length;
+  const checkedSlots = verifyAvailabilityFromEvents(availability, rooms, schedule.events, maxWeek);
   verifyDirectory(directory, schedule.events, common);
 
   console.log(`v2 data verified: ${rooms.rooms.length} rooms, ${schedule.events.length} events, ${checkedSlots} availability slots.`);

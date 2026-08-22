@@ -58,22 +58,15 @@ npm run dev
 
 默认情况下，Vite 会在本地启动开发地址，并在终端输出访问 URL。
 
-解析课表：
+解析课表并生成 v2 数据：
 
 ```bash
-npm run parse
+npm run build-data
 ```
 
-解析课程、教师和班级索引：
+校验 v2 数据：
 
 ```bash
-npm run parse-schedule
-```
-
-生成并校验 v2 模块化数据：
-
-```bash
-npm run build-data-v2
 npm run verify-data-v2
 ```
 
@@ -95,7 +88,7 @@ npm run preview
 npm run update-data
 ```
 
-`npm run update-data` 会依次执行 `npm run parse`、`npm run parse-schedule`、`npm run build-data-v2` 和 `npm run build`。推荐在更新课表或准备部署时使用。
+`npm run update-data` 会依次执行 `npm run build-data` 和 `npm run build`。推荐在更新课表或准备部署时使用。
 
 ## 项目结构
 
@@ -104,16 +97,15 @@ npm run update-data
 ├─ .github/workflows/deploy-pages.yml   GitHub Pages 部署流程
 ├─ public/
 │  └─ data/
-│     ├─ classroom-data.json            教室、时间段和占用数据
-│     ├─ schedule-index.json            课程、教师和班级索引
 │     ├─ setting.json                   网站运行配置
-│     └─ v2/                            模块化数据产物
+│     └─ v2/                            前端读取的模块化数据产物
 ├─ scripts/
-│  ├─ parse-classrooms.js               教室课表解析器
-│  └─ parse-schedule.js                 课程、教师和班级索引解析器
-│  ├─ build-data-v2.js                  v2 数据构建器
+│  ├─ build-data.js                     统一构建器：解析课表 HTML 并直接生成 v2 数据
 │  ├─ verify-data-v2.js                 v2 一致性校验
-│  └─ class-normalization.json          班级别名和拆分规则
+│  ├─ class-normalization.json          班级别名和拆分规则
+│  ├─ parse-classrooms.js               （旧版）教室课表解析器，回退用
+│  ├─ parse-schedule.js                 （旧版）课程、教师和班级索引解析器，回退用
+│  └─ build-data-v2.js                  （旧版）v2 数据构建器，回退用
 ├─ src/
 │  ├─ App.jsx                           页面组件和主要业务逻辑
 │  ├─ main.jsx                          React 应用入口
@@ -139,16 +131,19 @@ kbxx_xzb_ifr_*.html          行政班课表
 
 ### 1. 放置原始课表
 
-将新的教室课表 HTML 文件放到 `.source-data/`，文件名保持以下格式：
+将新的课表 HTML 文件放到 `.source-data/`，文件名保持以下格式：
 
 ```text
 kbxx_classroom_ifr_2026-2027-1.html
 ```
 
-解析器会查找所有匹配以下模式的文件：
+构建器会查找所有匹配以下模式的文件：
 
 ```text
 kbxx_classroom_ifr_*.html
+kbxx_kc_ifr_*.html
+kbxx_teacher_ifr_*.html
+kbxx_xzb_ifr_*.html
 ```
 
 PowerShell 中先指定课表目录：
@@ -157,30 +152,30 @@ PowerShell 中先指定课表目录：
 $env:SCHEDULE_SOURCE_DIR = ".source-data"
 ```
 
-不带参数运行时，`parse-classrooms.js` 会按文件名排序并自动选择最新教室课表：
+不带参数运行时，`build-data.js` 会为每类文件按文件名排序并自动选择最新的教室课表：
 
 ```bash
-npm run parse
+npm run build-data
 ```
 
-如果根目录中有多个课表文件，也可以明确指定输入文件：
+如果课表目录中有多个教室课表文件，也可以明确指定输入文件：
 
 ```bash
-npm run parse -- kbxx_classroom_ifr_2026-2027-1.html
+npm run build-data -- kbxx_classroom_ifr_2026-2027-1.html
 ```
 
-### 2. 生成前端数据
+### 2. 生成 v2 数据
 
-解析器读取课表中的：
+构建器读取四类课表中的：
 
 ```html
 <table id="kbtable">
 ```
 
-并生成：
+解析后直接生成：
 
 ```text
-public/data/classroom-data.json
+public/data/v2/
 ```
 
 解析器支持以下两类 HTML：
@@ -188,41 +183,17 @@ public/data/classroom-data.json
 1. 教务系统直接保存的原始 HTML。
 2. 浏览器“查看源代码”后保存的、包含 `line-wrap` 包装结构的 HTML。
 
-执行成功后会输出教室数量、课程记录数量和检测到的最大周次。
+执行成功后会输出教室数量、课程记录数量、检测到的最大周次，以及 v2 各文件的统计与校验计数。
 
-### 3. 生成课程索引
-
-将课程、教师和行政班课表放在同一个课表目录：
-
-```text
-kbxx_kc_ifr_*.html
-kbxx_teacher_ifr_*.html
-kbxx_xzb_ifr_*.html
-```
-
-执行：
-
-```bash
-npm run parse-schedule
-```
-
-解析器会为三类文件分别选择文件名排序后最新的文件，合并生成：
-
-```text
-public/data/schedule-index.json
-```
-
-该文件供课程、教师和班级检索，以及实体周课表使用。
-
-### 4. 一次完成更新和构建
+### 3. 一次完成更新和构建
 
 ```bash
 npm run update-data
 ```
 
-执行后会同时更新 `classroom-data.json`、`schedule-index.json`、`public/data/v2/` 并生成生产构建。
+执行后会更新 `public/data/v2/` 并生成生产构建。
 
-### 5. 构建并检查
+### 4. 构建并检查
 
 ```bash
 npm run update-data
@@ -230,19 +201,16 @@ npm run update-data
 
 执行后建议检查：
 
-- `public/data/classroom-data.json` 的 `generatedAt`
-- `sourceFile` 是否是预期文件
-- `summary.totalRooms` 是否合理
-- `summary.totalEntries` 是否合理
-- `summary.maxWeek` 是否合理
-- `public/data/schedule-index.json` 的 `generatedAt`、`sourceFiles` 和 `summary` 是否合理
+- 构建输出中的教室数量、课程事件数量和最大周次是否合理
+- `public/data/v2/common.json` 的 `sourceFiles` 是否是预期文件
+- `public/data/v2/manifest.json` 的 `summary` 是否合理
 - `npm run verify-data-v2` 是否通过
 
 GitHub Actions 只构建已提交的数据，不再解析原始 HTML。因此更新课表后，必须在本地运行 `npm run update-data`，并提交生成后的数据文件。
 
 ### v2 模块化数据
 
-前端已使用 `public/data/v2/`：首屏读取 `manifest.json`、`common.json`、`rooms.json` 和 `availability.json`；打开教室详情、实体课表或命令面板时才读取 `schedule.json`；普通课程、教师和班级搜索先使用 `directory.json` 的倒排索引。旧 JSON 仅保留为解析兼容产物。
+前端已使用 `public/data/v2/`：首屏读取 `manifest.json`、`common.json`、`rooms.json` 和 `availability.json`；打开教室详情、实体课表或命令面板时才读取 `schedule.json`；普通课程、教师和班级搜索先使用 `directory.json` 的倒排索引。旧版 `classroom-data.json` 与 `schedule-index.json` 已不再生成；如需回退旧管道，可使用保留的 `parse`、`parse-schedule` 和 `build-data-v2` 脚本。
 
 班级组合文本按逗号分段，段末的 `班` 仅作为分隔标记移除，例如 `工业设计26班,电信26B班` 生成 `工业设计26` 和 `电信26B`。`新闻26AB`、`新闻26CD` 等带字母后缀的班级保持原样；只有在 `scripts/class-normalization.json` 的 `splits` 中显式配置时才会拆分。
 
@@ -353,7 +321,7 @@ public/data/setting.json
 其他日期：假期
 ```
 
-考试周和假期只是顶部的显示状态。内部课程查询仍使用数字周次，并继续受 `classroom-data.json` 中 `summary.maxWeek` 限制，不会把“考试周”或“假期”作为课程查询周次传入数据层。
+考试周和假期只是顶部的显示状态。内部课程查询仍使用数字周次，并继续受 `manifest.json` 中 `summary.maxWeek` 限制，不会把“考试周”或“假期”作为课程查询周次传入数据层。
 
 ### 通知配置
 
@@ -471,9 +439,8 @@ dist/
 
 部署前需要确认：
 
-- `public/data/classroom-data.json` 已经是最新版本。
+- `public/data/v2/` 已经是最新版本。
 - `public/data/setting.json` 已经包含当前学期配置。
-- `public/data/schedule-index.json` 和 `public/data/v2/` 已通过本地数据更新流程生成。
 - GitHub 仓库的 Pages 发布源配置为 GitHub Actions。
 - 如果使用自定义域名，`CNAME` 内容和域名 DNS 配置正确。
 
@@ -512,7 +479,7 @@ npm run build
 如果修改了课表解析器，还应运行：
 
 ```bash
-npm run parse
+npm run build-data
 ```
 
 并检查生成数据的摘要信息。
@@ -523,16 +490,16 @@ npm run parse
 
 依次检查：
 
-1. `public/data/classroom-data.json` 是否已经更新。
-2. `dist/data/classroom-data.json` 是否已经更新。
+1. `public/data/v2/` 是否已经更新。
+2. `dist/data/v2/` 是否已经更新。
 3. 浏览器是否需要强制刷新。
 4. 静态服务器是否缓存了旧 JSON 文件。
 
 建议对以下文件设置较短缓存时间，或在重新部署后主动刷新缓存：
 
 ```text
-/data/classroom-data.json
 /data/setting.json
+/data/v2/manifest.json
 ```
 
 ### 解析器提示找不到课表
@@ -576,7 +543,7 @@ data/setting.json
 1. 将新的 `kbxx_classroom_ifr_*.html`、`kbxx_kc_ifr_*.html`、`kbxx_teacher_ifr_*.html` 和 `kbxx_xzb_ifr_*.html` 放到 `.source-data/`。
 2. 修改 public/data/setting.json 中的 semesterStartDate 和 semesterEndDate。
 3. 执行 npm run update-data。
-4. 执行 npm run verify-data-v2，并检查解析输出、generatedAt、sourceFile/sourceFiles 和 summary。
+4. 执行 npm run verify-data-v2，并检查构建输出和 manifest 的 sourceFiles 与 summary。
 5. 执行 npm run build，确认构建通过。
 6. 提交生成后的数据、配置和代码变更；原始课表不应提交到主仓库。
 7. 推送到 main，等待 GitHub Pages 工作流完成。
