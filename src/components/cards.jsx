@@ -47,9 +47,9 @@ export function RoomCard({
           <span className="text-gray-300">/</span>
           <span>{room.floor} 层</span>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5">
-          <span className="min-w-0 truncate text-xs text-gray-400">{room.zone.replace("普通教学区", "教学区")}</span>
-          <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-primary-600 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        <div className="mt-3 flex items-start justify-between gap-2 border-t border-gray-100 pt-2.5">
+          <span className="min-w-0 flex-1 text-xs leading-snug text-gray-400">{room.zone.replace("普通教学区", "教学区")}</span>
+          <span className="hidden shrink-0 items-center gap-0.5 text-xs font-medium text-primary-600 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:inline-flex">
             查看课表
             <ArrowUpRight size={13} />
           </span>
@@ -124,7 +124,7 @@ export function EntityResultCard({ view, label, entries, eventCount, onOpen }) {
         <Icon size={18} />
       </span>
       <span className="min-w-0 flex-1">
-        <strong className="block truncate text-sm font-semibold text-gray-900">{label}</strong>
+        <strong className="block text-sm font-semibold leading-snug text-gray-900">{label}</strong>
         <small className="mt-0.5 block truncate text-xs text-gray-500">{detail}</small>
       </span>
       <span className="hidden shrink-0 items-center gap-1 text-xs font-medium text-primary-600 sm:inline-flex">

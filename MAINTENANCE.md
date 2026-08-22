@@ -134,7 +134,7 @@ public/data/setting.json
 | `defaultPeriodMode` | 字符串 | 默认节次模式，可选 `single` 或 `multiple` |
 | `searchResultLimit` | 数字 | 课程检索最多显示的结果数量 |
 | `enableCommandPalette` | 布尔值 | 是否启用搜索面板和 `Ctrl / Cmd + K` |
-| `enableBackToTop` | 布尔值 | 是否启用右下角回顶按钮 |
+| `enableBackToTop` | 布尔值 | 是否启用右下角悬浮按钮（单击返回筛选，长按回到顶部） |
 | `stickyFilters` | 布尔值 | 保留的历史配置字段，已不生效；筛选栏始终显示并随页面滚动 |
 | `schoolTimeZone` | 字符串 | 学校时区，当前默认使用 `Asia/Shanghai` |
 

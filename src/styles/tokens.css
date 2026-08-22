@@ -188,3 +188,107 @@
     transform: translateX(100%);
   }
 }
+
+#narrow-screen-blocker {
+  display: none;
+}
+
+@media (max-width: 319px) {
+  #root {
+    display: none !important;
+  }
+
+  #narrow-screen-blocker {
+    display: grid;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    visibility: visible !important;
+    opacity: 1 !important;
+    place-items: center;
+    padding: 24px;
+    background: var(--color-gray-50);
+  }
+
+  #narrow-screen-blocker .nsb-card {
+    width: 100%;
+    max-width: 280px;
+    padding: 24px 20px;
+    text-align: center;
+    border: 1px solid var(--color-gray-200);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: var(--shadow-lg);
+  }
+
+  #narrow-screen-blocker .nsb-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 14px;
+    border-radius: 12px;
+    background: var(--color-primary-50);
+    color: var(--color-primary-600);
+  }
+
+  #narrow-screen-blocker svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  #narrow-screen-blocker h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--color-gray-900);
+  }
+
+  #narrow-screen-blocker .nsb-text {
+    margin: 10px 0 0;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--color-gray-500);
+  }
+
+  #narrow-screen-blocker .nsb-try {
+    margin: 14px 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-gray-600);
+    text-align: left;
+  }
+
+  #narrow-screen-blocker ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    text-align: left;
+  }
+
+  #narrow-screen-blocker li {
+    padding: 3px 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-gray-600);
+  }
+
+  #narrow-screen-blocker li::before {
+    content: "·";
+    margin-right: 8px;
+    font-weight: 700;
+    color: var(--color-primary-500);
+  }
+
+  #narrow-screen-blocker code {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--color-gray-100);
+    font-size: 11px;
+    color: var(--color-gray-400);
+  }
+}

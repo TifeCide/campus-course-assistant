@@ -19,6 +19,26 @@
   </head>
   <body>
     <div id="root"></div>
+    <div id="narrow-screen-blocker" style="visibility:hidden;opacity:0">
+      <div class="nsb-card">
+        <div class="nsb-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="13" rx="2"/>
+            <path d="M8 21h8M12 17v4"/>
+          </svg>
+        </div>
+        <h1>屏幕宽度受限</h1>
+        <p class="nsb-text">很抱歉，当前设备的显示区域过窄，为保证您的体验，暂不支持在此窗口浏览。</p>
+        <p class="nsb-try">您可以尝试：</p>
+        <ul>
+          <li>展开折叠屏手机使用内屏</li>
+          <li>切换至电脑模式</li>
+          <li>改用平板或电脑访问</li>
+          <li>调小系统或浏览器的缩放级别</li>
+        </ul>
+        <code>错误代码：ERR_DISPLAY_WIDTH_INSUFFICIENT</code>
+      </div>
+    </div>
     <!-- 应用程序的根容器 -->
     <script type="module" src="/src/main.jsx"></script>
   </body>

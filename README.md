@@ -17,7 +17,7 @@
 - 收藏教室，并保存最近查询
 - 支持通知中心和配置化通知
 - 支持命令面板和 `Ctrl / Cmd + K` 快速搜索
-- 滚动到结果区时在顶栏下方出现「返回筛选」快捷入口，一键回到筛选面板
+- 悬浮按钮：描边实时显示页面滚动进度，单击返回筛选面板，长按回到顶部
 - 教室属性徽章（机房、会议室等），通过外挂 JSON 人工配置
 - 查询条件同步到 URL，便于分享和恢复
 - 支持结果区域遮罩
@@ -310,7 +310,7 @@ public/data/setting.json
 | `defaultPeriodMode` | 字符串 | 默认节次模式，可选 `single` 或 `multiple` |
 | `searchResultLimit` | 数字 | 课程检索最多显示的结果数量 |
 | `enableCommandPalette` | 布尔值 | 是否启用命令面板和快速搜索 |
-| `enableBackToTop` | 布尔值 | 是否启用回到顶部按钮 |
+| `enableBackToTop` | 布尔值 | 是否启用右下角悬浮按钮（单击返回筛选，长按回到顶部） |
 | `stickyFilters` | 布尔值 | 保留的历史配置字段，已不生效；筛选栏始终显示并随页面滚动 |
 | `schoolTimeZone` | 字符串 | 学校时区配置字段，当前时间计算固定使用 `Asia/Shanghai` |
 

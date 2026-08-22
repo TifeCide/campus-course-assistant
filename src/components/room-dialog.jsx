@@ -110,20 +110,16 @@ export function RoomDialog({
       </div>
 
       <div className="space-y-4 px-5 py-4">
-        <div className="relative z-30 grid animate-slide-up grid-cols-3 gap-2">
-          <div className="rounded-lg bg-gray-50 px-3 py-2">
-            <span className="block text-[11px] text-gray-500">当前周次</span>
-            <strong className="block text-sm font-semibold text-gray-900">第 {selectedWeek} 周</strong>
-          </div>
+        <div className="relative z-30 grid animate-slide-up grid-cols-2 gap-2">
           <div className="rounded-lg bg-gray-50 px-3 py-2">
             <span className="block text-[11px] text-gray-500">当前定位</span>
-            <strong className="block truncate text-sm font-semibold text-gray-900">
-              {selectedDay?.shortLabel} · {selectedPeriodLabel}
+            <strong className="block text-sm font-semibold leading-snug text-gray-900">
+              第 {selectedWeek} 周 · {selectedDay?.shortLabel} · {selectedPeriodLabel}
             </strong>
           </div>
           <div className="rounded-lg bg-gray-50 px-3 py-2">
             <span className="block text-[11px] text-gray-500">当前状态</span>
-            <strong className={cn("block text-sm font-semibold", occupied.length ? "text-warning-600" : "text-success-700")}>
+            <strong className={cn("block text-sm font-semibold leading-snug", occupied.length ? "text-warning-600" : "text-success-700")}>
               {occupied.length ? "占用" : "空闲"}
             </strong>
           </div>

@@ -324,18 +324,16 @@ export function EntityScheduleDialog({
       </div>
 
       <div className="space-y-4 px-5 py-4">
-        <div className="relative z-30 grid animate-slide-up grid-cols-3 gap-2">
+        <div className="relative z-30 grid animate-slide-up grid-cols-2 gap-2">
           <div className="rounded-lg bg-gray-50 px-3 py-2">
             <span className="block text-[11px] text-gray-500">本周安排</span>
-            <strong className="block truncate text-sm font-semibold text-gray-900">{weekEntries.length} 项</strong>
-          </div>
-          <div className="rounded-lg bg-gray-50 px-3 py-2">
-            <span className="block text-[11px] text-gray-500">关联信息</span>
-            <strong className="block truncate text-sm font-semibold text-gray-900">{relatedLabel}</strong>
+            <strong className="block text-sm font-semibold leading-snug text-gray-900">
+              {weekEntries.length} 项 · {relatedLabel}
+            </strong>
           </div>
           <div className="rounded-lg bg-gray-50 px-3 py-2">
             <span className="block text-[11px] text-gray-500">涉及教室</span>
-            <strong className="block truncate text-sm font-semibold text-gray-900">{roomCount} 间</strong>
+            <strong className="block text-sm font-semibold leading-snug text-gray-900">{roomCount} 间</strong>
           </div>
         </div>
 
@@ -344,7 +342,7 @@ export function EntityScheduleDialog({
             <Clock3 size={15} className="mt-0.5 shrink-0 text-primary-500" />
             <div className="min-w-0">
               <span className="block text-[11px] text-gray-500">当前定位</span>
-              <strong className="block truncate text-sm font-semibold text-gray-900">
+              <strong className="block text-sm font-semibold leading-snug text-gray-900">
                 {selectedDay?.shortLabel} {selectedPeriodLabel}
               </strong>
               <small className="mt-0.5 block text-xs text-gray-400">
@@ -358,7 +356,7 @@ export function EntityScheduleDialog({
               <span className="block text-[11px] text-gray-500">
                 {liveStatus?.currentEntries.length ? "正在上课" : "下一节课程"}
               </span>
-              <strong className="block truncate text-sm font-semibold text-gray-900">
+              <strong className="block text-sm font-semibold leading-snug text-gray-900">
                 {liveStatus?.currentEntries[0]?.courseName || liveStatus?.nextEntry?.courseName || "当前周暂无后续课程"}
               </strong>
               <small className="mt-0.5 block truncate text-xs text-gray-400">

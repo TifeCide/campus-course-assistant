@@ -132,7 +132,6 @@ function App() {
   const [commandQuery, setCommandQuery] = useState("");
   const [favorites, setFavorites] = useFavorites();
   const [recentQueries, saveRecentQuery] = useRecentQueries();
-  const [backToFiltersState, setBackToFiltersState] = useState("hidden");
   const [urlInitialized, setUrlInitialized] = useState(false);
   const autoInitialized = useRef(false);
   const currentNow = useClock();
@@ -350,35 +349,28 @@ function App() {
   const [showResultsJump, setShowResultsJump] = useState(false);
   const queryPanelRef = useRef(null);
   const resultsSectionRef = useRef(null);
-  const resultsZoneRef = useRef(false);
-  const lastScrollYRef = useRef(0);
-  const backToFiltersStateRef = useRef("hidden");
-  const backToFiltersTimerRef = useRef(0);
+  const longPressRef = useRef({ timer: 0, triggered: false });
 
-  /* 「返回筛选」提示条的状态机：shown 为常驻显示，leaving 播放上滑淡出过渡后再卸载： */
-  function transitionBackToFilters(next) {
-    const current = backToFiltersStateRef.current;
-    if (current === next) return;
-    window.clearTimeout(backToFiltersTimerRef.current);
+  /* 悬浮按钮的长按检测：按住约 450ms 触发回到顶部；松开时的 click 事件会依据 triggered 标记忽略，短按则正常返回筛选。 */
+  function startLongPressTracker() {
+    longPressRef.current.triggered = false;
+    window.clearTimeout(longPressRef.current.timer);
+    longPressRef.current.timer = window.setTimeout(() => {
+      longPressRef.current.triggered = true;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 450);
+  }
 
-    if (next === "shown") {
-      backToFiltersStateRef.current = "shown";
-      setBackToFiltersState("shown");
+  function cancelLongPressTracker() {
+    window.clearTimeout(longPressRef.current.timer);
+  }
+
+  function handleFloatButtonClick() {
+    if (longPressRef.current.triggered) {
+      longPressRef.current.triggered = false;
       return;
     }
-
-    if (current === "shown") {
-      backToFiltersStateRef.current = "leaving";
-      setBackToFiltersState("leaving");
-      backToFiltersTimerRef.current = window.setTimeout(() => {
-        backToFiltersStateRef.current = "hidden";
-        setBackToFiltersState("hidden");
-      }, 200);
-      return;
-    }
-
-    backToFiltersStateRef.current = "hidden";
-    setBackToFiltersState("hidden");
+    scrollBackToFilters();
   }
 
   useEffect(() => {
@@ -500,7 +492,7 @@ function App() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [settings.enableCommandPalette]);
 
-  /* 使用 useEffect 钩子在组件挂载时添加滚动和调整大小事件监听器，以便在用户滚动页面或调整窗口大小时更新滚动进度、“跳转到结果”与“返回筛选”按钮的显示状态。当组件卸载时，移除事件监听器： */
+  /* 使用 useEffect 钩子在组件挂载时添加滚动和调整大小事件监听器，以便在用户滚动页面或调整窗口大小时更新滚动进度与“跳转到结果”按钮的显示状态。当组件卸载时，移除事件监听器： */
   useEffect(() => {
     const updateScrollProgress = () => {
       const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
@@ -521,19 +513,6 @@ function App() {
       } else {
         setShowResultsJump(false);
       }
-
-      if (resultsSection) {
-        const inDeepZone = resultsSection.getBoundingClientRect().top < 240;
-        const scrollingDown = scrollTop - lastScrollYRef.current > 0;
-        if (inDeepZone && scrollingDown && !resultsZoneRef.current) {
-          transitionBackToFilters("shown");
-        }
-        if (!inDeepZone && scrollTop < 300) {
-          transitionBackToFilters("hidden");
-        }
-        resultsZoneRef.current = inDeepZone;
-      }
-      lastScrollYRef.current = scrollTop;
     };
 
     updateScrollProgress();
@@ -882,9 +861,8 @@ function App() {
     replaceDetailHistoryState(nextStack);
   }
 
-  /*平滑滚动返回筛选面板位置，并立即收回提示条： */
+  /*平滑滚动返回筛选面板位置： */
   function scrollBackToFilters() {
-    transitionBackToFilters("hidden");
     const panel = queryPanelRef.current;
     if (!panel) return;
     const rect = panel.getBoundingClientRect();
@@ -984,7 +962,7 @@ function App() {
   return (
     <div className="min-h-dvh bg-gray-50">
       <header className="fixed inset-x-0 top-0 z-30 border-b border-gray-200/70 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex h-[72px] max-w-[1200px] items-center justify-between px-5 sm:px-6 lg:px-[clamp(20px,5vw,72px)]">
+        <div className="mx-auto flex h-[72px] max-w-[1400px] items-center justify-between px-5 sm:px-6 lg:px-[clamp(20px,5vw,72px)]">
           <button className="flex items-center gap-3 rounded-lg" onClick={handleBrandClick} type="button" aria-label="返回首页并重置筛选">
             <span className="grid h-[38px] w-[38px] shrink-0 place-items-center overflow-hidden rounded-[11px] bg-primary-600 shadow-[0_7px_17px_rgb(23_105_224/0.28)]">
               <BrandMarkIcon />
@@ -1021,7 +999,7 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1200px] px-5 pt-[92px] pb-16 sm:px-6 lg:px-[clamp(20px,5vw,72px)]">
+      <main className="mx-auto w-full max-w-[1400px] px-5 pt-[92px] pb-16 sm:px-6 lg:px-[clamp(20px,5vw,72px)]">
         <section className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="hero-copy min-w-0">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-primary-100 bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700">
@@ -1066,19 +1044,19 @@ function App() {
 
         <section ref={queryPanelRef} className="mt-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="relative flex gap-0.5 rounded-lg bg-gray-100 p-1">
+            <div className="relative mx-auto flex gap-0.5 rounded-lg bg-gray-100 p-1 sm:mx-0">
               <SegmentedThumb count={VIEW_TABS.length} index={Math.max(0, VIEW_TABS.findIndex((tab) => tab.view === activeView))} />
               {VIEW_TABS.map(({ view, label, icon: Icon }) => (
                 <button
                   key={view}
                   className={cn(
-                    "relative z-10 inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors duration-150 active:scale-[0.96]",
+                    "relative z-10 inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-[13px] font-medium transition-colors duration-150 active:scale-[0.96] sm:gap-1.5 sm:px-3 sm:text-sm",
                     activeView === view ? "text-gray-900" : "text-gray-500 hover:text-gray-800",
                   )}
                   onClick={() => changeView(view)}
                   type="button"
                 >
-                  <Icon size={15} />
+                  <Icon size={15} className="shrink-0" />
                   {label}
                 </button>
               ))}
@@ -1208,22 +1186,6 @@ function App() {
             </button>
           </div>
           </section>
-
-          {backToFiltersState !== "hidden" ? (
-            <div className="pointer-events-none fixed inset-x-0 top-[84px] z-20 flex justify-center px-4">
-              <button
-                className={cn(
-                  "pointer-events-auto flex h-9 items-center gap-1.5 rounded-full border border-white/60 bg-white/95 pl-3.5 pr-3 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-md transition-all duration-200 hover:text-primary-700 active:scale-[0.97]",
-                  backToFiltersState === "leaving" ? "-translate-y-2 opacity-0" : "animate-slide-down",
-                )}
-                onClick={scrollBackToFilters}
-                type="button"
-              >
-                <ArrowUp size={13} className="text-primary-600" />
-                返回筛选
-              </button>
-            </div>
-          ) : null}
 
         {favoriteRooms.length ? (
           <section className="card mt-4 px-4 py-3.5" aria-label="收藏教室">
@@ -1405,7 +1367,7 @@ function App() {
 
 
       <footer className="border-t border-gray-200/70">
-        <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-2 px-4 py-6 text-xs text-gray-400 sm:flex-row sm:justify-between sm:px-6">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-center gap-2 px-4 py-6 text-xs text-gray-400 sm:flex-row sm:justify-between sm:px-6">
           <span>数据更新于 {formatDateTime(data.generatedAt)}</span>
 
           <a
@@ -1507,20 +1469,27 @@ function App() {
       {settings.enableBackToTop ? (
         <button
           className={cn(
-            "fixed right-5 bottom-5 z-30 h-11 w-11 rounded-full p-[2px] shadow-lg transition-all duration-200 active:scale-[0.92]",
-            scrollProgress > 0.02 ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0",
+            "fixed bottom-5 left-1/2 z-30 -translate-x-1/2 select-none rounded-full p-[2px] shadow-lg transition-all duration-500 ease-out active:scale-[0.97]",
+            scrollProgress > 0.02 ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0",
           )}
           type="button"
-          aria-label="回到顶部"
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="单击返回筛选，长按回到顶部"
+          title="单击返回筛选 · 长按回到顶部"
+          onClick={handleFloatButtonClick}
+          onPointerDown={startLongPressTracker}
+          onPointerUp={cancelLongPressTracker}
+          onPointerLeave={cancelLongPressTracker}
+          onPointerCancel={cancelLongPressTracker}
+          onContextMenu={(event) => event.preventDefault()}
           style={{
             background:
               "conic-gradient(from 0deg, var(--color-primary-500) calc(var(--scroll-progress) * 1%), var(--color-gray-200) 0)",
             "--scroll-progress": `${Math.round(scrollProgress * 100)}`,
           }}
         >
-          <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-gray-600 transition-colors duration-150 hover:text-primary-600">
-            <ArrowUp size={17} />
+          <span className="flex h-10 items-center gap-1.5 rounded-full border border-gray-200 bg-white pl-3.5 pr-3 text-xs font-medium text-gray-700 transition-colors duration-150 hover:text-primary-700">
+            <ArrowUp size={13} className="text-primary-600" />
+            返回筛选
           </span>
         </button>
       ) : null}
