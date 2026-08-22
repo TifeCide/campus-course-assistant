@@ -1,16 +1,17 @@
 # 课室查询系统维护备忘录
 
-更新时间：2026-08-10
+更新时间：2026-08-22
 
 ## 1. 项目概览
 
-这是一个纯前端课室查询系统，使用 React、Vite 和 lucide-react 构建。
+这是一个纯前端课室查询系统，使用 React、Vite、Tailwind CSS v4 和 lucide-react 构建。
 
 系统运行时从以下文件读取数据：
 
 ```text
 public/data/setting.json
 public/data/v2/
+public/data/room-attributes.json   （可选，教室属性徽章）
 ```
 
 不需要后端服务，也不需要鉴权。
@@ -134,7 +135,7 @@ public/data/setting.json
 | `searchResultLimit` | 数字 | 课程检索最多显示的结果数量 |
 | `enableCommandPalette` | 布尔值 | 是否启用搜索面板和 `Ctrl / Cmd + K` |
 | `enableBackToTop` | 布尔值 | 是否启用右下角回顶按钮 |
-| `stickyFilters` | 布尔值 | 是否启用筛选栏吸顶 |
+| `stickyFilters` | 布尔值 | 保留的历史配置字段，已不生效；筛选栏始终显示并随页面滚动 |
 | `schoolTimeZone` | 字符串 | 学校时区，当前默认使用 `Asia/Shanghai` |
 
 修改配置后不需要重新解析课表，但部署前仍建议重新执行：
@@ -144,6 +145,10 @@ npm run build
 ```
 
 `maskMessage` 当前优先读取 `title`，同时兼容旧配置中的 `tittle`。
+
+### 教室属性徽章（room-attributes.json）
+
+人工维护的外挂数据，用于给机房、不开门的大教室等特殊教室显示提醒徽章。结构为 `roomtype` 类型字典 + `list` 教室映射，完整 schema 见 README「教室属性徽章」一节。修改后只需重新执行 `npm run build` 发布；文件缺失或加载失败时页面静默降级。
 
 ## 5. 主要文件
 
@@ -197,13 +202,15 @@ Could not find #kbtable in source HTML.
 | Key | 内容 |
 | --- | --- |
 | `classroom-favorites` | 收藏的教室编号 |
-| `classroom-recent-queries` | 最近查询条件 |
+| `classroom-recent-queries` | 最近查询条件（查询状态通过 URL 稳定保持 5 秒后才写入） |
+| `classroom-dismissed-notifications` | 已关闭的通知编号 |
 
-如果调试时发现旧筛选条件或收藏影响页面，可以在浏览器控制台执行：
+如果调试时发现旧筛选条件、收藏或通知状态影响页面，可以在浏览器控制台执行：
 
 ```js
 localStorage.removeItem("classroom-favorites");
 localStorage.removeItem("classroom-recent-queries");
+localStorage.removeItem("classroom-dismissed-notifications");
 ```
 
 ## 8. 修改功能时的建议

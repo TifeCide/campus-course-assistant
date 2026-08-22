@@ -17,6 +17,8 @@
 - 收藏教室，并保存最近查询
 - 支持通知中心和配置化通知
 - 支持命令面板和 `Ctrl / Cmd + K` 快速搜索
+- 滚动到结果区时在顶栏下方出现「返回筛选」快捷入口，一键回到筛选面板
+- 教室属性徽章（机房、会议室等），通过外挂 JSON 人工配置
 - 查询条件同步到 URL，便于分享和恢复
 - 支持结果区域遮罩
 - 支持数据文件多来源加载、失败提示和自动重试
@@ -99,6 +101,7 @@ npm run update-data
 ├─ public/
 │  └─ data/
 │     ├─ setting.json                   网站运行配置
+│     ├─ room-attributes.json           教室属性徽章外挂数据（人工维护）
 │     └─ v2/                            前端读取的模块化数据产物
 ├─ scripts/
 │  ├─ build-data.js                     统一构建器：解析课表 HTML 并直接生成 v2 数据
@@ -117,7 +120,6 @@ npm run update-data
 │  ├─ components/                       可复用 UI 组件（对话框、卡片、选择器、通知等）
 │  ├─ hooks/                            useClock、useFavorites、useRecentQueries 等状态钩子
 │  └─ utils/                            时间、教室占用、查询快照、v2 数据转换等纯函数
-├─ CNAME                                GitHub Pages 自定义域名
 ├─ index.html                           HTML 入口
 ├─ package.json                         脚本和依赖配置
 ├─ package-lock.json                    依赖锁定文件
@@ -159,7 +161,7 @@ PowerShell 中先指定课表目录：
 $env:SCHEDULE_SOURCE_DIR = ".source-data"
 ```
 
-不带参数运行时，`build-data.js` 会为每类文件按文件名排序并自动选择最新的教室课表：
+不带参数运行时，`build-data.js` 会为每类课表按文件名排序并各自选择最新的文件：
 
 ```bash
 npm run build-data
@@ -309,7 +311,7 @@ public/data/setting.json
 | `searchResultLimit` | 数字 | 课程检索最多显示的结果数量 |
 | `enableCommandPalette` | 布尔值 | 是否启用命令面板和快速搜索 |
 | `enableBackToTop` | 布尔值 | 是否启用回到顶部按钮 |
-| `stickyFilters` | 布尔值 | 保留的历史配置字段，当前筛选栏固定为随页面滚动，滚动到结果区时自动收起 |
+| `stickyFilters` | 布尔值 | 保留的历史配置字段，已不生效；筛选栏始终显示并随页面滚动 |
 | `schoolTimeZone` | 字符串 | 学校时区配置字段，当前时间计算固定使用 `Asia/Shanghai` |
 
 当前配置示例：
@@ -400,7 +402,7 @@ public/data/setting.json
 
 - 数据按“当前域名 + 浏览器”隔离；同一仓库在不同域名（Cloudflare Pages / GitHub Pages）之间不共享本地状态。
 - 隐私模式、受限 WebView 或浏览器策略可能禁用 `localStorage`；应用会静默降级为“仅当前会话可见”，不阻断查询功能。
-- 最近查询会持久化查询快照，切换视图时可能影响“返回后显示内容”，排查时可先清空 `classroom-recent-queries`。
+- 最近查询仅在当前查询状态通过 URL 稳定保持 5 秒后才写入，避免路过性筛选污染记录；排查“返回后显示内容”问题时可先清空 `classroom-recent-queries`。
 
 调试时如需清除这些状态，可以在浏览器控制台执行：
 
@@ -481,7 +483,6 @@ dist/
 - `public/data/v2/` 已经是最新版本。
 - `public/data/setting.json` 已经包含当前学期配置。
 - GitHub 仓库的 Pages 发布源配置为 GitHub Actions。
-- 如果使用自定义域名，`CNAME` 内容和域名 DNS 配置正确。
 
 ### Vite 基础路径
 
